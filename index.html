@@ -1,0 +1,970 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Meal Plan">
+<title>Meal Plan</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#0a0a0a;--s1:#1c1c1e;--s2:#2c2c2e;--s3:#3a3a3c;
+  --accent:#0a84ff;--green:#30d158;--orange:#ff9f0a;--red:#ff453a;--yellow:#ffd60a;
+  --t1:#ffffff;--t2:rgba(235,235,245,0.8);--t3:rgba(235,235,245,0.55);
+  --tab:83px;
+}
+html,body{height:100%;background:var(--bg);color:var(--t1);
+  font-family:-apple-system,'Helvetica Neue',sans-serif;
+  overscroll-behavior:none;-webkit-tap-highlight-color:transparent;touch-action:manipulation}
+#app{height:100%;display:flex;flex-direction:column}
+.section{display:none;flex:1;overflow-y:auto;
+  padding:calc(env(safe-area-inset-top,44px) + 16px) 16px calc(var(--tab) + env(safe-area-inset-bottom,0px) + 20px);
+  -webkit-overflow-scrolling:touch;gap:10px;flex-direction:column}
+.section.active{display:flex}
+/* Tab bar */
+#tab-bar{position:fixed;bottom:0;left:0;right:0;
+  height:calc(var(--tab) + env(safe-area-inset-bottom,0px));
+  padding-bottom:env(safe-area-inset-bottom,0px);
+  background:rgba(28,28,30,0.95);backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px);
+  border-top:1px solid rgba(255,255,255,0.1);
+  display:flex;align-items:flex-start;padding-top:10px;z-index:100}
+.tab{flex:1;display:flex;flex-direction:column;align-items:center;gap:3px;
+  background:none;border:none;color:var(--t3);font-size:10px;font-family:inherit;
+  cursor:pointer;padding:4px 0;transition:color .2s}
+.tab.active{color:var(--accent)}
+.tab svg{width:22px;height:22px;fill:currentColor;display:block}
+/* Section title */
+.section-title{font-size:28px;font-weight:700;letter-spacing:-.5px;margin-bottom:4px}
+/* Cal header */
+#cal-header{display:flex;align-items:center;justify-content:space-between}
+#cal-range{font-size:14px;color:var(--t3);font-weight:500}
+.icon-btn{background:var(--s2);border:none;color:var(--t1);
+  width:32px;height:32px;border-radius:50%;font-size:16px;
+  display:flex;align-items:center;justify-content:center;cursor:pointer}
+/* Day cards */
+.day-card{background:var(--s1);border-radius:16px;padding:13px 14px;
+  display:flex;align-items:center;gap:11px;cursor:pointer;position:relative;
+  border:1.5px solid transparent;transition:opacity .15s}
+.day-card:active{opacity:.7}
+.day-card.is-today{background:var(--s2);border-color:var(--accent)}
+.day-card.is-yesterday{opacity:.55}
+.day-dot{width:9px;height:9px;border-radius:50%;flex-shrink:0}
+.dot-stovetop{background:var(--accent)}
+.dot-oven{background:var(--orange)}
+.dot-crockpot{background:var(--green)}
+.dot-none{background:var(--s3)}
+.day-date{display:flex;flex-direction:column;align-items:center;min-width:34px}
+.day-abbr{font-size:10px;font-weight:700;color:var(--t3);text-transform:uppercase;letter-spacing:.5px}
+.day-num{font-size:20px;font-weight:700;line-height:1.1}
+.day-info{flex:1;min-width:0}
+.day-meal{font-size:15px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.day-sub{font-size:12px;color:var(--t3);margin-top:2px}
+.day-badges{display:flex;flex-direction:column;gap:4px;flex-shrink:0;align-items:flex-end}
+.badge{font-size:10px;font-weight:700;padding:3px 7px;border-radius:6px;letter-spacing:.3px;white-space:nowrap}
+.badge-shop{background:var(--yellow);color:#000}
+.badge-sams{background:var(--green);color:#000}
+.badge-prep{background:var(--green);color:#000}
+.badge-prepped{background:var(--s3);color:var(--t2)}
+.badge-rice{background:rgba(255,159,10,.2);color:var(--orange)}
+/* Meals list */
+.meal-item{background:var(--s1);border-radius:14px;padding:11px 13px;
+  display:flex;align-items:center;gap:9px;transition:opacity .2s}
+.meal-item.muted{opacity:.4}
+.meal-item.dragging{opacity:.5;background:var(--s2)}
+.drag-handle{color:var(--t3);font-size:18px;cursor:grab;padding:4px 2px;
+  touch-action:none;user-select:none;-webkit-user-select:none;line-height:1}
+.meal-num{font-size:12px;color:var(--t3);min-width:20px;text-align:right;font-variant-numeric:tabular-nums}
+.mbadge{font-size:10px;font-weight:700;padding:2px 6px;border-radius:5px;flex-shrink:0}
+.mbadge-stovetop{background:rgba(10,132,255,.18);color:var(--accent)}
+.mbadge-oven{background:rgba(255,159,10,.18);color:var(--orange)}
+.mbadge-crockpot{background:rgba(48,209,88,.18);color:var(--green)}
+.meal-info{flex:1;min-width:0;cursor:pointer}
+.meal-name{font-size:15px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.meal-macros{font-size:11px;color:var(--t3);margin-top:1px}
+.meal-acts{display:flex;gap:5px;flex-shrink:0}
+.act-btn{background:var(--s2);border:none;color:var(--t2);
+  width:30px;height:30px;border-radius:8px;font-size:13px;
+  display:flex;align-items:center;justify-content:center;cursor:pointer}
+.act-btn.muted-on{color:var(--orange)}
+.act-btn.del{color:var(--red)}
+#add-recipe-btn{width:100%;background:none;border:1.5px dashed var(--s3);
+  color:var(--accent);font-size:15px;font-weight:600;font-family:inherit;
+  padding:14px;border-radius:14px;cursor:pointer;margin-top:2px}
+/* Shopping */
+.pill-tabs{display:flex;gap:8px;overflow-x:auto;scrollbar-width:none;padding-bottom:2px;flex-shrink:0;min-height:40px;align-items:center}
+.pill-tabs::-webkit-scrollbar{display:none}
+.pill-tab{background:var(--s2);border:none;color:var(--t2);font-size:14px;font-weight:600;
+  font-family:inherit;padding:8px 16px;border-radius:20px;cursor:pointer;white-space:nowrap;flex-shrink:0}
+.pill-tab.active{background:var(--accent);color:#fff}
+.store-toggle{display:flex;background:var(--s2);border-radius:10px;padding:3px}
+.store-btn{flex:1;background:none;border:none;color:var(--t3);
+  font-size:14px;font-weight:600;font-family:inherit;padding:8px;border-radius:8px;cursor:pointer}
+.store-btn.active{background:var(--s3);color:var(--t1)}
+.shop-cat-title{font-size:11px;font-weight:700;color:var(--t3);
+  text-transform:uppercase;letter-spacing:.8px;padding:12px 0 6px}
+.shop-item{display:flex;align-items:center;gap:12px;
+  padding:10px 0;border-bottom:1px solid var(--s2);cursor:pointer}
+.shop-item:last-child{border-bottom:none}
+.shop-chk{width:22px;height:22px;border:2px solid var(--s3);border-radius:50%;
+  flex-shrink:0;display:flex;align-items:center;justify-content:center;transition:all .15s}
+.shop-item.checked .shop-chk{background:var(--accent);border-color:var(--accent)}
+.shop-item.checked .shop-chk::after{content:'';width:5px;height:9px;
+  border:2px solid #fff;border-top:none;border-left:none;
+  transform:rotate(45deg) translateY(-1px)}
+.shop-item-text{flex:1;font-size:15px;line-height:1.3}
+.shop-item.checked .shop-item-text{color:var(--t3);text-decoration:line-through}
+.shop-meal-ct{font-size:11px;color:var(--t3);flex-shrink:0}
+#reset-shop-btn{width:100%;background:none;border:1px solid var(--s3);
+  color:var(--t3);font-size:15px;font-family:inherit;
+  padding:14px;border-radius:14px;cursor:pointer;margin-top:12px}
+/* Modals */
+.modal{position:fixed;inset:0;z-index:200;display:flex;align-items:flex-end}
+.modal.hidden{display:none}
+.modal-bd{position:absolute;inset:0;background:rgba(0,0,0,.55)}
+.modal-sheet{position:relative;width:100%;max-height:92vh;
+  background:var(--s1);border-radius:20px 20px 0 0;
+  overflow-y:auto;-webkit-overflow-scrolling:touch;
+  padding:8px 20px calc(env(safe-area-inset-bottom,0px) + 28px)}
+.modal-pill{width:36px;height:4px;background:var(--s3);border-radius:2px;margin:0 auto 14px}
+.modal-close{position:absolute;top:16px;right:16px;background:var(--s2);
+  border:none;color:var(--t2);width:30px;height:30px;border-radius:50%;
+  font-size:15px;display:flex;align-items:center;justify-content:center;cursor:pointer}
+/* Recipe modal content */
+.rm-title{font-size:22px;font-weight:700;margin-bottom:8px;padding-right:40px}
+.rm-meta{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:14px}
+.rm-macros{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:4px}
+.macro-box{background:var(--s2);border-radius:10px;padding:10px 8px;text-align:center}
+.macro-val{font-size:18px;font-weight:700}
+.macro-lbl{font-size:10px;color:var(--t3);margin-top:2px}
+.rm-sec{font-size:12px;font-weight:700;color:var(--t3);
+  text-transform:uppercase;letter-spacing:.8px;margin:16px 0 8px}
+.rm-ing{font-size:15px;padding:5px 0;border-bottom:1px solid var(--s2);color:var(--t2)}
+.rm-step{font-size:15px;padding:8px 0;border-bottom:1px solid var(--s2);
+  line-height:1.5;display:flex;gap:10px;color:var(--t2)}
+.step-n{font-weight:700;color:var(--accent);flex-shrink:0;width:18px}
+.bs-box{background:rgba(48,209,88,.08);border:1px solid rgba(48,209,88,.25);
+  border-radius:12px;padding:12px;margin-top:16px;font-size:14px;color:var(--t2);line-height:1.5}
+.bs-lbl{font-size:11px;font-weight:700;color:var(--green);
+  text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px}
+/* Add recipe form */
+.form-group{margin-bottom:14px}
+.form-lbl{font-size:12px;font-weight:600;color:var(--t3);
+  text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px;display:block}
+.form-input,.form-textarea,.form-select{
+  width:100%;background:var(--s2);border:1px solid var(--s3);
+  border-radius:10px;color:var(--t1);font-size:16px;font-family:inherit;padding:11px 12px}
+.form-textarea{min-height:90px;resize:vertical}
+.form-input:focus,.form-textarea:focus,.form-select:focus{outline:none;border-color:var(--accent)}
+.form-row{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+/* Mini calendar */
+.mini-cal{background:var(--s2);border-radius:14px;overflow:hidden}
+.mini-cal-hdr{display:flex;align-items:center;justify-content:space-between;
+  padding:12px 14px;border-bottom:1px solid var(--s3)}
+.mini-cal-title{font-size:16px;font-weight:700}
+.mini-nav{background:none;border:none;color:var(--accent);
+  font-size:18px;cursor:pointer;padding:4px 10px}
+.mini-grid{display:grid;grid-template-columns:repeat(7,1fr);text-align:center;padding:6px 6px 10px}
+.mini-dow{font-size:11px;font-weight:700;color:var(--t3);padding:6px 0;text-transform:uppercase}
+.mini-day{padding:7px 0;font-size:14px;cursor:pointer;border-radius:8px;margin:1px}
+.mini-day.disabled{color:var(--t3);opacity:.3;cursor:default}
+.mini-day.selected{background:var(--accent);color:#fff;font-weight:700}
+.mini-day.empty{cursor:default}
+.save-btn{width:100%;background:var(--accent);border:none;color:#fff;
+  font-size:17px;font-weight:600;font-family:inherit;
+  padding:16px;border-radius:14px;cursor:pointer;margin-top:14px}
+.save-btn:disabled{opacity:.4;cursor:default}
+.step-hint{font-size:13px;color:var(--t3);margin-bottom:14px}
+</style>
+</head>
+<body>
+<div id="app">
+
+<section id="sec-calendar" class="section active">
+  <div id="cal-header">
+    <span class="section-title" id="cal-title">Calendar</span>
+    <div style="display:flex;align-items:center;gap:8px">
+      <span id="cal-range"></span>
+      <button class="icon-btn" id="cal-prev" onclick="calNav(-1)">&#8249;</button>
+      <button class="icon-btn" id="cal-next" onclick="calNav(1)">&#8250;</button>
+    </div>
+  </div>
+  <div id="cal-cards"></div>
+</section>
+
+<section id="sec-meals" class="section">
+  <span class="section-title">Meals</span>
+  <div id="meals-list"></div>
+  <button id="add-recipe-btn" onclick="openAddModal()">+ Add Recipe</button>
+</section>
+
+<section id="sec-shopping" class="section" style="padding:0;gap:0;overflow:hidden">
+  <div id="shop-header" style="flex-shrink:0;padding:calc(env(safe-area-inset-top,44px) + 16px) 16px 12px;background:var(--bg);z-index:10;display:flex;flex-direction:column;gap:10px">
+    <span class="section-title">Shopping</span>
+    <div id="shop-tabs" class="pill-tabs"></div>
+    <div id="shop-store-toggle" class="store-toggle"></div>
+  </div>
+  <div style="flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch;padding:0 16px calc(var(--tab) + env(safe-area-inset-bottom,0px) + 20px)">
+    <div id="shop-items"></div>
+    <button id="reset-shop-btn" onclick="resetShopList()">Reset List</button>
+  </div>
+</section>
+
+</div>
+
+<nav id="tab-bar">
+  <button class="tab active" data-sec="sec-calendar" onclick="showSection('sec-calendar')">
+    <svg viewBox="0 0 24 24"><path d="M19 4h-1V2h-2v2H8V2H6v2H5C3.9 4 3 4.9 3 6v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 16H5V9h14v11zm0-13H5V6h14v1z"/></svg>
+    <span>Calendar</span>
+  </button>
+  <button class="tab" data-sec="sec-meals" onclick="showSection('sec-meals')">
+    <svg viewBox="0 0 24 24"><path d="M18.06 22.99h1.66c.84 0 1.53-.64 1.63-1.46L23 5.05h-5V1h-1.97v4.05h-4.97l.3 2.34c1.71.47 3.31 1.32 4.27 2.26 1.44 1.42 2.43 2.89 2.43 5.29v8.05zM1 21.99V21h15.03v.99c0 .55-.45 1-1.01 1H2.01c-.56 0-1.01-.45-1.01-1zm15.03-7c0-8-15.03-8-15.03 0h15.03zM1.02 17h15v2h-15z"/></svg>
+    <span>Meals</span>
+  </button>
+  <button class="tab" data-sec="sec-shopping" onclick="showSection('sec-shopping')">
+    <svg viewBox="0 0 24 24"><path d="M7 18c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2zM1 2v2h2l3.6 7.59L5.25 14c-.16.28-.25.61-.25.96C5 16.1 5.9 17 7 17h14v-2H7.42c-.14 0-.25-.11-.25-.25l.03-.12.9-1.63H19c.75 0 1.41-.41 1.75-1.03l3.58-6.49A1 1 0 0023.54 4H5.21l-.94-2H1zm16 16c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2z"/></svg>
+    <span>Shopping</span>
+  </button>
+</nav>
+
+<div id="modal-recipe" class="modal hidden">
+  <div class="modal-bd" onclick="closeModal('modal-recipe')"></div>
+  <div class="modal-sheet">
+    <div class="modal-pill"></div>
+    <button class="modal-close" onclick="closeModal('modal-recipe')">&#10005;</button>
+    <div id="modal-recipe-body"></div>
+  </div>
+</div>
+
+<div id="modal-add" class="modal hidden">
+  <div class="modal-bd" onclick="closeModal('modal-add')"></div>
+  <div class="modal-sheet">
+    <div class="modal-pill"></div>
+    <button class="modal-close" onclick="closeModal('modal-add')">&#10005;</button>
+    <div id="modal-add-body"></div>
+  </div>
+</div>
+
+<script>
+// ── CONSTANTS ──────────────────────────────────────────────
+const ROTATION_START = new Date(2026,5,15);
+const FIRST_BULK_SUNDAY = new Date(2026,5,14);
+const BULK_INTERVAL = 14;
+
+// ── MEALS DATA ─────────────────────────────────────────────
+const MEALS = {
+'honey-garlic-chicken-skillet':{name:'Honey Garlic Chicken Skillet',method:'stovetop',prepTime:10,cookTime:25,servings:4,ingredients:['2.5 lbs boneless skinless chicken thighs','2 tbsp cornstarch','1 tsp salt','½ tsp black pepper','1 tbsp olive oil','2 tbsp unsalted butter','6 cloves garlic, minced','⅓ cup chicken broth','⅓ cup honey','1½ tbsp soy sauce','1 tbsp rice vinegar','1½ cups dry brown rice'],steps:['Cook rice: combine 1½ cups brown rice and 3 cups water. Bring to boil, reduce to low, cover tightly, cook 40–45 min.','Pat chicken dry with paper towels. Toss with cornstarch, salt, and pepper.','Whisk broth, honey, soy sauce, and rice vinegar together. Set aside.','Heat olive oil in large skillet over medium-high. Add chicken smooth side down. Cook 5–6 min without moving.','Flip chicken. Cook 4–5 more min. Move to edges.','Add butter to center. Once melted add garlic, stir 60 sec.','Pour sauce over everything. Simmer on medium-low, spooning sauce over chicken every min for 4–5 min until thickened and chicken hits 165°F.','Serve over rice with all pan sauce.'],macros:{calories:680,protein:72,carbs:52,fat:22},estimatedCost:12,bloodSugarNote:"High protein + fat slows glucose absorption from honey and rice. Don't skip rice — complex carbs + protein prevents crashes better than protein alone."},
+'teriyaki-chicken-bowl':{name:'Teriyaki Chicken Bowl',method:'stovetop',prepTime:10,cookTime:20,servings:4,ingredients:['2.5 lbs boneless skinless chicken thighs','⅓ cup soy sauce','4 tbsp brown sugar','1 tbsp water','2 cloves garlic, minced','1½ tsp fresh ginger, grated','2½ tbsp cooking oil, divided','1½ cups dry brown rice','3 cups broccoli florets'],steps:['Cook rice: 1½ cups rice + 3 cups water, boil, cover, simmer low 40–45 min.','Whisk soy sauce, brown sugar, water, garlic, ginger, 1 tbsp oil. Marinate chicken 30 min minimum.','Heat 1½ tbsp oil over medium. Cook chicken 6–8 min per side until 165°F and caramelized.','Steam broccoli in microwave-safe bowl with 2 tbsp water, covered, 3–4 min.','Rest chicken 5 min then slice.','Serve over rice with broccoli.'],macros:{calories:640,protein:70,carbs:48,fat:18},estimatedCost:12,bloodSugarNote:'Marinate overnight for best flavor. Eat protein first before rice. Brown sugar per serving is about 1 tbsp total split four ways.'},
+'greek-chicken-bowl':{name:'Greek Chicken Bowl',method:'stovetop',prepTime:15,cookTime:20,servings:4,ingredients:['2.5 lbs boneless skinless chicken thighs','3 tbsp olive oil (marinade)','4 tbsp fresh lemon juice (about 2 lemons)','1½ tsp lemon zest','4 cloves garlic, minced','1 tsp dried oregano','½ tsp dried thyme','1 tsp salt','½ tsp black pepper','1½ cups dry brown rice','1 medium cucumber, diced','½ cup crumbled feta cheese','2 tbsp fresh parsley, chopped','1 tbsp olive oil (cooking)'],steps:['Cook rice: 1½ cups rice + 3 cups water, boil, cover, simmer low 40–45 min.','Whisk 3 tbsp oil, lemon juice, zest, garlic, oregano, thyme, salt, pepper. Marinate chicken 30 min–8 hrs.','Heat 1 tbsp oil in heavy skillet over medium-high. Cook chicken 6–7 min per side until 165°F.','Rest 5 min, then slice into strips.','Build bowls: rice, chicken, cucumber, feta, parsley, extra lemon.'],macros:{calories:620,protein:71,carbs:44,fat:20},estimatedCost:13,bloodSugarNote:'Zero sugar in marinade. Feta fat slows glucose uptake from rice. Cucumber adds volume with almost zero carbs.'},
+'chicken-black-bean-skillet':{name:'Chicken and Black Bean Skillet',method:'stovetop',prepTime:10,cookTime:25,servings:4,ingredients:['2.5 lbs boneless skinless chicken thighs, cut into 1-inch pieces','2 cans (15 oz each) black beans, drained and rinsed','1½ cups dry brown rice','1 tsp cumin','1 tsp smoked paprika','½ tsp garlic powder','1 tsp salt','4 cloves garlic, minced','1 cup chicken broth','Juice of 2 limes','¼ cup fresh cilantro, chopped','1 tbsp olive oil','1 cup shredded cheddar cheese'],steps:['Cook rice: 1½ cups rice + 3 cups water, boil, cover, simmer low 40–45 min.','Mix spices. Season chicken pieces.','Heat oil over medium-high. Sear chicken 4–5 min without stirring, flip, cook 3–4 more min.','Add garlic, stir 60 sec.','Add beans and broth. Simmer uncovered 5–7 min until broth reduces by half.','Squeeze lime, add cilantro.','Serve over rice topped with cheddar.'],macros:{calories:690,protein:75,carbs:58,fat:18},estimatedCost:11,bloodSugarNote:'Black beans dramatically blunt the glycemic response of rice. One of the best blood sugar meals on the list.'},
+'cilantro-lime-chicken-bowl':{name:'Cilantro Lime Chicken Bowl',method:'stovetop',prepTime:15,cookTime:20,servings:4,ingredients:['2.5 lbs boneless skinless chicken thighs','Juice of 3 limes, divided','Zest of 1 lime','4 cloves garlic, minced','1 tsp cumin','1 tsp salt','1 tbsp olive oil','1½ cups dry brown rice','2 cans (15 oz each) black beans, drained','½ cup fresh cilantro, roughly chopped, divided','2 avocados, sliced','½ cup sour cream'],steps:['Make cilantro lime rice: cook 1½ cups rice with 3 cups water, juice of 1 lime, lime zest, ½ tsp salt. When done, stir in half the cilantro.','Combine juice of 2 limes, garlic, cumin, salt, oil. Marinate chicken 20–30 min.','Cook chicken over medium-high 6–7 min per side until 165°F.','Rest 5 min then slice.','Warm black beans with pinch of cumin.','Build bowls: rice, beans, chicken, avocado, remaining cilantro, sour cream.'],macros:{calories:700,protein:73,carbs:60,fat:21},estimatedCost:12,bloodSugarNote:"Don't skip the avocado — healthy fat slows gastric emptying significantly."},
+'sesame-ginger-chicken':{name:'Sesame Ginger Chicken',method:'stovetop',prepTime:10,cookTime:25,servings:4,ingredients:['2.5 lbs boneless skinless chicken thighs, cut into 1-inch pieces','¼ cup soy sauce','2 tbsp sesame oil','2 tbsp rice vinegar','2 tbsp honey','1½ tbsp fresh ginger, grated','4 cloves garlic, minced','1 tbsp cornstarch','¼ cup water','1 tbsp cooking oil','3 cups broccoli florets','1½ cups dry brown rice','2 tbsp sesame seeds','3 green onions, green parts only, sliced'],steps:['Cook rice: 1½ cups rice + 3 cups water, boil, cover, simmer low 40–45 min.','Whisk sauce: soy sauce, sesame oil, vinegar, honey, ginger, garlic, cornstarch, water.','Heat wok over HIGH until smoking. Add oil. Add chicken in single layer, sear 3–4 min without moving. Stir, cook 2–3 more min. Remove.','Add broccoli to wok, stir-fry 3–4 min on high.','Return chicken. Pour sauce. Toss 2–3 min until sauce thickens.','Serve over rice. Top with sesame seeds and green onion.'],macros:{calories:660,protein:70,carbs:52,fat:22},estimatedCost:12,bloodSugarNote:'Broccoli adds soluble fiber slowing glucose absorption. Honey per serving is about ½ tbsp — minimal with this much protein.'},
+'chicken-stir-fry':{name:'Chicken Stir Fry',method:'stovetop',prepTime:10,cookTime:20,servings:4,ingredients:['2.5 lbs boneless skinless chicken thighs, cut into 1-inch pieces','3 cups broccoli florets','2 cups snap peas or green beans, trimmed','4 cloves garlic, minced','1 tbsp fresh ginger, grated','3 tbsp soy sauce','1 tbsp oyster sauce','1 tbsp cornstarch','½ cup chicken broth','1 tsp sesame oil','1 tsp sugar','1½ tbsp cooking oil','1½ cups dry brown rice'],steps:['Cook rice: 1½ cups rice + 3 cups water, boil, cover, simmer low 40–45 min.','Whisk sauce: soy sauce, oyster sauce, cornstarch, broth, sesame oil, sugar.','Heat wok over HIGH until very hot. Add 1 tbsp oil. Add chicken, sear 3–4 min, stir, cook 2 more min. Remove.','Add remaining oil. Stir-fry broccoli and snap peas 3–4 min.','Add garlic and ginger, stir 30 sec.','Return chicken, pour sauce. Toss 2 min until thickened.','Serve immediately over rice.'],macros:{calories:620,protein:70,carbs:45,fat:19},estimatedCost:11,bloodSugarNote:'High vegetable-to-rice ratio. Eat protein and vegetables first, then rice for best blood sugar.'},
+'chicken-rice-skillet':{name:'Chicken and Rice Skillet',method:'stovetop',prepTime:10,cookTime:35,servings:4,ingredients:['2.5 lbs boneless skinless chicken thighs','1½ cups long-grain white rice','3 cups chicken broth','1 cup water','5 cloves garlic, minced','1 tsp Italian seasoning','1 tsp garlic powder','1 tsp salt','½ tsp black pepper','½ cup freshly grated parmesan','2 tbsp butter','1 tbsp olive oil'],steps:['Season chicken with garlic powder, salt, pepper, half the Italian seasoning.','Heat oil over medium-high. Sear chicken 5–6 min per side until golden. Remove — not fully cooked yet.','Reduce heat to medium. Melt butter, add garlic, stir 60 sec.','Add rice, toast 2 min. Pour in broth and water, scrape up bits. Add remaining seasoning.','Nestle chicken back in. Bring to boil.','Cover, cook on low 20 min. Rest covered 5 more min.','Top with parmesan. Serve from pan.'],macros:{calories:690,protein:74,carbs:52,fat:22},estimatedCost:12,bloodSugarNote:'Chicken protein and parmesan fat buffer white rice glycemic response. High protein-to-carb ratio is protective.'},
+'chipotle-chicken-bowl':{name:'Smoky Chipotle Chicken Bowl',method:'stovetop',prepTime:10,cookTime:20,servings:4,ingredients:['2.5 lbs boneless skinless chicken thighs','1 tbsp smoked paprika','1 tsp cumin','1 tsp garlic powder','1 tsp dried oregano','1 tsp salt','½ tsp black pepper','1 tbsp olive oil','1½ cups dry brown rice','2 cans (15 oz each) black beans, drained','Juice of 1 lime','1 cup shredded cheddar or Monterey Jack','½ cup sour cream','Fresh cilantro'],steps:['Cook rice with lime juice stirred in when done.','Mix all spices. Coat chicken thighs generously — press spices in.','Heat oil in cast iron over medium-high until smoking. Cook chicken 6–7 min per side until deep golden and 165°F.','Rest 5 min, slice.','Warm beans with pinch of cumin and salt.','Build bowls: rice, beans, chicken, cheese, sour cream, cilantro.'],macros:{calories:730,protein:77,carbs:62,fat:22},estimatedCost:11,bloodSugarNote:'Best blood sugar meal on the list. Protein + fat (sour cream, cheese) + fiber (beans) working together is very effective.'},
+'ground-beef-rice-bowl':{name:'Ground Beef Rice Bowl',method:'stovetop',prepTime:5,cookTime:25,servings:4,ingredients:['2 lbs 80/20 ground beef','1½ cups dry brown rice','2 cans (15 oz each) black beans, drained','4 cloves garlic, minced','2 tbsp soy sauce','1 tbsp Worcestershire sauce','1 tsp smoked paprika','1 tsp cumin','1 tsp salt','1 cup shredded cheddar','½ cup sour cream','Fresh cilantro (optional)'],steps:['Cook rice: 1½ cups rice + 3 cups water, boil, cover, simmer low 40–45 min.','Brown beef over medium-high, breaking into crumbles, 8–10 min. Drain most fat.','Add garlic, stir 60 sec.','Add soy sauce, Worcestershire, spices. Cook 2 min.','Add beans, heat through 3 min.','Serve over rice. Top with cheddar and sour cream.'],macros:{calories:710,protein:65,carbs:58,fat:25},estimatedCost:11,bloodSugarNote:'Ground beef is zero carbs. Beans are complex carbs with fiber. Sour cream fat further slows digestion.'},
+'beef-potato-skillet':{name:'Beef and Potato Skillet',method:'stovetop',prepTime:10,cookTime:30,servings:4,ingredients:['2 lbs 80/20 ground beef','1.5 lbs Yukon Gold potatoes, diced ½-inch','4 cloves garlic, minced','1 tsp smoked paprika','1 tsp garlic powder','1 tsp salt','½ tsp black pepper','1 tbsp olive oil','1½ cups shredded cheddar cheese','4 tbsp sour cream'],steps:['Cook potatoes in skillet with 1 cup water covered 8–10 min until fork-tender. Drain.','Push potatoes aside. Add olive oil, brown beef 8–10 min. Drain most fat.','Season beef. Add garlic, stir 60 sec.','Combine beef and potatoes, cook together 3–4 min.','Top with cheddar, cover 2 min to melt.','Serve with sour cream.'],macros:{calories:680,protein:55,carbs:30,fat:37},estimatedCost:11,bloodSugarNote:'Yukon Golds have lower GI than Russets. Cheese and beef fat buffer the glycemic response. Very filling.'},
+'beef-taco-bowl':{name:'Beef Taco Bowl',method:'stovetop',prepTime:5,cookTime:25,servings:4,ingredients:['2 lbs 80/20 ground beef','1½ cups dry brown rice','2 cans (15 oz each) black or pinto beans, drained','4 cloves garlic, minced','2 tbsp chili powder','1 tsp cumin','1 tsp garlic powder','1 tsp smoked paprika','1 tsp salt','¼ tsp cayenne','½ cup water','1 cup shredded Mexican cheese blend','½ cup sour cream','Juice of 2 limes','Fresh cilantro'],steps:['Cook rice.','Brown beef, drain most fat.','Add garlic, stir 60 sec.','Add spices, water. Simmer 3–4 min.','Add beans, heat 3 min.','Build bowls: rice, beef+beans, cheese, sour cream, lime, cilantro.'],macros:{calories:720,protein:67,carbs:62,fat:26},estimatedCost:11,bloodSugarNote:'Classic taco bowl: protein from beef, fiber from beans, fat from cheese and sour cream all working together.'},
+'sesame-ginger-beef':{name:'Sesame Ginger Beef Bowl',method:'stovetop',prepTime:10,cookTime:20,servings:4,ingredients:['2 lbs 80/20 ground beef','3 cups broccoli florets','¼ cup soy sauce','2 tbsp sesame oil','2 tbsp rice vinegar','1 tbsp honey','1½ tbsp fresh ginger, grated','4 cloves garlic, minced','1 tbsp cornstarch','¼ cup water','1 tbsp cooking oil','1½ cups dry brown rice','2 tbsp sesame seeds','Green onion tops, sliced'],steps:['Cook rice.','Whisk sauce: soy sauce, sesame oil, vinegar, honey, ginger, garlic, cornstarch, water.','Heat oil over high. Spread beef thin, cook 4–5 min without stirring. Break up, cook 3 more min. Drain, leave 1 tbsp fat.','Push beef aside. Add broccoli, cook 3–4 min.','Pour sauce over everything. Toss 2–3 min until thick.','Serve over rice. Top with sesame seeds and green onion.'],macros:{calories:680,protein:60,carbs:50,fat:26},estimatedCost:11,bloodSugarNote:'Broccoli adds fiber. Honey is ¼ tbsp per serving — not significant with this much protein and fat.'},
+'turkey-taco-bowl':{name:'Turkey Taco Bowl',method:'stovetop',prepTime:5,cookTime:25,servings:4,ingredients:['2 lbs 93/7 ground turkey','1½ cups dry brown rice','2 cans (15 oz each) black beans, drained','4 cloves garlic, minced','2 tbsp chili powder','1 tsp cumin','1 tsp garlic powder','1 tsp smoked paprika','1 tsp salt','½ cup chicken broth','1 cup shredded Mexican cheese blend','½ cup sour cream','Juice of 2 limes','Fresh cilantro'],steps:['Cook rice.','Cook turkey over medium-high 8–10 min stirring frequently. Drain.','Add garlic, stir 60 sec. Add spices and broth, simmer 3–4 min.','Add beans, heat 3 min.','Build bowls: rice, turkey+beans, cheese, sour cream, lime, cilantro.'],macros:{calories:680,protein:72,carbs:60,fat:18},estimatedCost:12,bloodSugarNote:'93/7 turkey is one of the leanest proteins available — more protein per calorie than ground beef.'},
+'turkey-rice-skillet':{name:'Turkey and Rice Skillet',method:'stovetop',prepTime:10,cookTime:35,servings:4,ingredients:['2 lbs 93/7 ground turkey','1½ cups long-grain white rice','3½ cups chicken broth','5 cloves garlic, minced','1 tsp Italian seasoning','1 tsp garlic powder','1 tsp salt','½ tsp black pepper','¾ cup freshly grated parmesan','2 tbsp butter','¼ cup fresh parsley, chopped'],steps:['Brown turkey over medium-high 8–10 min. Season. Drain excess liquid.','Add butter, garlic, stir 60 sec.','Add rice, toast 2 min.','Pour in broth, add Italian seasoning. Bring to boil.','Cover, cook on low 18–20 min. Rest 5 min.','Stir in parmesan. Garnish with parsley.'],macros:{calories:650,protein:70,carbs:48,fat:20},estimatedCost:12,bloodSugarNote:'Parmesan fat buffers white rice glycemic response. Turkey is pure lean protein. Well-balanced.'},
+'turkey-potato-skillet':{name:'Ground Turkey and Potato Skillet',method:'stovetop',prepTime:10,cookTime:30,servings:4,ingredients:['2 lbs 93/7 ground turkey','1.5 lbs Yukon Gold potatoes, diced ½-inch','5 cloves garlic, minced','1 tsp smoked paprika','1 tsp garlic powder','1 tsp Italian seasoning','1 tsp salt','½ tsp black pepper','1 tbsp olive oil','1½ cups shredded cheddar','4 tbsp sour cream'],steps:['Steam potatoes with 1 cup water covered 8–10 min. Drain.','Add olive oil, cook turkey 8–10 min. Season with spices.','Add garlic, stir 60 sec.','Add potatoes back, cook together 3–4 min.','Top with cheddar, cover to melt.','Serve with sour cream.'],macros:{calories:640,protein:67,carbs:28,fat:28},estimatedCost:11,bloodSugarNote:'Lower carb than rice-based meals. Potatoes + lean protein + cheese is solid for reactive hypoglycemia.'},
+'sausage-potato-hash':{name:'Sausage and Potato Hash',method:'stovetop',prepTime:10,cookTime:30,servings:4,ingredients:['1.5 lbs smoked beef or pork sausage, sliced ½-inch coins','1.5 lbs Yukon Gold potatoes, diced ½-inch','4 cloves garlic, minced','1 tsp smoked paprika','1 tsp garlic powder','1 tsp salt','8 large eggs','1 tbsp olive oil','½ cup shredded cheddar','Fresh parsley'],steps:['Cook potatoes with 1 cup water covered 8–10 min. Drain.','Crisp potatoes in olive oil 4–5 min per side. Season. Add sausage coins, cook 3–4 min.','Add garlic, stir 60 sec.','Make 4 wells, crack 2 eggs per well. Cover, cook 4–5 min.','Top with cheddar, melt 1 min.','Garnish with parsley.'],macros:{calories:680,protein:58,carbs:28,fat:40},estimatedCost:12,bloodSugarNote:'Eggs are zero-carb protein + fat. Most blood sugar stable meal on the list. Very slow sustained digestion.'},
+'salmon-rice-bowl':{name:'Pan-Seared Salmon Rice Bowl',method:'stovetop',prepTime:10,cookTime:20,servings:4,ingredients:['1.5 lbs salmon fillets, 4 portions (~6 oz each), skin-off','1½ cups dry brown rice','2 avocados, sliced','1 tbsp cooking oil','1 tsp salt','½ tsp black pepper','3 tbsp soy sauce','1 tbsp sesame oil','1 tbsp rice vinegar','2 tsp honey','2 cloves garlic, minced','1 tsp fresh ginger, grated','2 tbsp sesame seeds','Green onion tops, sliced'],steps:['Cook rice.','Whisk sauce: soy sauce, sesame oil, vinegar, honey, garlic, ginger.','Pat salmon completely dry. Season with salt and pepper.','Heat oil in non-stick over medium-high. Sear salmon presentation-side down 4–5 min until a crust forms.','Flip carefully. Cook 2–3 min more. Pour half the sauce over. Cook 1 more min.','Serve over rice. Drizzle remaining sauce. Fan avocado slices alongside. Top with sesame seeds and green onion.'],macros:{calories:650,protein:52,carbs:50,fat:28},estimatedCost:16,bloodSugarNote:"Salmon omega-3s improve insulin sensitivity. Avocado fat buffers glycemic response. Have Greek yogurt on side if needed."},
+'shrimp-fried-rice':{name:'Shrimp Fried Rice',method:'stovetop',prepTime:10,cookTime:20,servings:4,ingredients:['1.5 lbs large shrimp, peeled and deveined (frozen, thawed overnight)','3 cups cooked brown rice, cooled or day-old','4 large eggs','1 cup frozen peas','1 cup carrots, diced small','4 cloves garlic, minced','3 tbsp soy sauce','2 tbsp sesame oil','1 tsp fresh ginger, grated','2 tbsp cooking oil, divided','3 green onions, green parts only, sliced','Salt to taste'],steps:['IMPORTANT: use day-old or spread freshly cooked rice on baking sheet and refrigerate 1 hour. Cold dry rice is essential.','Pat shrimp dry. Season lightly with salt.','Heat 1 tbsp oil in wok over HIGH until smoking. Cook shrimp 1–2 min per side. Remove.','Stir-fry carrots 3 min. Add peas, cook 1 min.','Push to edges. Add remaining oil to center. Scramble 4 eggs just until barely set.','Add cold rice, spread thin. Let sit 2 min to crisp. Toss everything.','Add garlic and ginger, toss 30 sec. Add soy sauce and sesame oil, toss 2 min.','Return shrimp. Toss to heat. Top with green onions.'],macros:{calories:580,protein:52,carbs:50,fat:18},estimatedCost:15,bloodSugarNote:'~52g protein. Add hard-boiled egg or cottage cheese on side to hit protein targets.'},
+'lemon-garlic-shrimp-pasta':{name:'Lemon Garlic Shrimp Pasta',method:'stovetop',prepTime:10,cookTime:20,servings:4,ingredients:['1.5 lbs large shrimp, peeled and deveined','12 oz linguine or spaghetti','6 cloves garlic, minced','¼ cup unsalted butter','2 tbsp olive oil','½ cup chicken broth','Juice of 2 lemons (about ¼ cup)','Zest of 1 lemon','½ cup freshly grated parmesan','2 tbsp fresh parsley, chopped','1 tsp salt','½ tsp black pepper'],steps:['Cook pasta in salted water to al dente. Reserve 1 cup pasta water. Drain.','Pat shrimp dry. Season with salt and pepper.','Heat oil over medium-high. Cook shrimp 1–2 min per side. Remove.','Reduce heat. Add butter, melt. Add garlic, cook 2 min stirring constantly.','Add broth, lemon juice, zest. Simmer 3 min.','Add pasta, toss. Add pasta water if too thick.','Return shrimp. Toss gently.','Off heat, stir in parmesan and parsley. Serve immediately.'],macros:{calories:620,protein:48,carbs:58,fat:20},estimatedCost:15,bloodSugarNote:'Al dente pasta has significantly lower GI. Shrimp protein and butter fat slow glucose absorption.'},
+'tuna-noodle-skillet':{name:'Tuna Noodle Skillet',method:'stovetop',prepTime:5,cookTime:20,servings:4,ingredients:['3 cans (5 oz each) solid white albacore tuna in water, drained','8 oz egg noodles','2 cans (10.5 oz each) cream of mushroom soup','1 cup chicken broth','1 cup frozen peas','4 cloves garlic, minced','2 tbsp butter','½ cup sour cream','1 cup shredded cheddar','1 tsp garlic powder','½ tsp black pepper','Salt to taste','2 tbsp fresh parsley'],steps:['Cook egg noodles 2 min less than package. Reserve ½ cup pasta water. Drain.','Melt butter over medium. Add garlic, stir 60 sec.','Add soup and broth. Whisk smooth. Simmer.','Add sour cream, stir until smooth.','Add peas, cook 2 min.','Add noodles and tuna. Toss to coat. Add pasta water if too thick.','Season. Top with cheddar, cover 2 min to melt.','Garnish with parsley.'],macros:{calories:580,protein:45,carbs:42,fat:22},estimatedCost:10,bloodSugarNote:'Lower protein (~45g). Have a protein-rich snack on the side to hit daily goals.'},
+'egg-turkey-sausage-scramble':{name:'Egg and Turkey Sausage Scramble',method:'stovetop',prepTime:10,cookTime:25,servings:4,ingredients:['12 large eggs','1 lb ground turkey breakfast sausage','1.5 lbs Yukon Gold potatoes, diced ½-inch','4 cloves garlic, minced','1 tsp smoked paprika','1 tsp garlic powder','1 tsp salt','½ tsp black pepper','1 tbsp butter','1 tbsp olive oil','1 cup shredded cheddar','2 tbsp fresh parsley or chives'],steps:['Steam potatoes with 1 cup water 8–10 min. Drain.','Crisp potatoes in olive oil 4–5 min per side. Season. Remove.','Cook sausage 6–8 min, breaking up. Add garlic, stir 60 sec. Remove.','Melt butter over MEDIUM-LOW. Whisk eggs with salt and pepper. Pour in.','Fold slowly every 15–20 sec. Remove while still slightly wet.','Fold in potatoes and sausage gently.','Top with cheddar, cover briefly to melt. Garnish.'],macros:{calories:640,protein:62,carbs:26,fat:36},estimatedCost:12,bloodSugarNote:'Eggs + sausage are zero-carb proteins with fat. Potatoes are the only significant carb. Most blood sugar stable breakfast-dinner on the list.'},
+'pork-tenderloin-medallions':{name:'Pork Tenderloin Medallions with Pan Sauce',method:'stovetop',prepTime:10,cookTime:20,servings:4,ingredients:['1.5 lbs pork tenderloin, sliced into 1-inch medallions','1½ cups dry brown rice','3 cups fresh or frozen green beans, trimmed','4 cloves garlic, minced','2 tbsp butter, divided','1 tbsp olive oil','1 tsp Italian seasoning','1 tsp garlic powder','1 tsp salt','½ tsp black pepper','¼ cup chicken broth','1 tbsp Dijon mustard','1 tbsp honey','1 tsp fresh thyme (or ½ tsp dried)'],steps:['Cook rice.','Slice tenderloin into 1-inch medallions. Press each slightly flat. Season generously.','Heat oil and 1 tbsp butter over medium-high until foamy. Sear medallions 3–4 min per side until golden. Remove and tent with foil.','Add remaining butter. Add garlic, cook 60 sec.','Add broth, scrape bits. Add Dijon, honey, thyme. Simmer 2–3 min until coats a spoon.','Steam green beans: microwave with 2 tbsp water covered 3–4 min.','Plate medallions over rice. Spoon sauce over. Green beans alongside.'],macros:{calories:570,protein:55,carbs:50,fat:16},estimatedCost:13,bloodSugarNote:'Pork tenderloin is one of the leanest cuts. Honey-Dijon is only ¼ tbsp honey per serving. Green beans add fiber.'},
+'baked-chicken-potatoes':{name:'Baked Chicken Thighs and Roasted Potatoes',method:'oven',prepTime:10,cookTime:45,servings:4,ingredients:['2.5 lbs boneless skinless chicken thighs','2 lbs Yukon Gold potatoes, quartered','4 cloves garlic, minced','3 tbsp olive oil, divided','1 tsp smoked paprika, divided','1 tsp garlic powder, divided','1 tsp Italian seasoning','1 tsp salt, divided','½ tsp black pepper'],steps:['Preheat oven to 425°F. Line large sheet pan with foil.','Toss potatoes with 2 tbsp oil, half the spices. Spread on pan. Roast 15 min alone.','Mix remaining oil, garlic, remaining spices. Rub all over chicken.','Flip potatoes. Nestle chicken between potatoes.','Roast 25–30 min until chicken hits 165°F and is golden.','Rest 5 min before serving.'],macros:{calories:640,protein:68,carbs:35,fat:26},estimatedCost:12,bloodSugarNote:'High-heat roasting lowers potato GI vs boiling. Eat chicken first — protein before carbs helps.'},
+'parmesan-crusted-chicken':{name:'Parmesan Crusted Chicken',method:'oven',prepTime:15,cookTime:30,servings:4,ingredients:['2.5 lbs boneless skinless chicken thighs, pounded to ¾-inch','1 cup panko breadcrumbs','1 cup freshly grated parmesan','1 tsp garlic powder','1 tsp Italian seasoning','½ tsp salt','½ tsp black pepper','2 large eggs, beaten','3 cups broccoli florets','2 tbsp olive oil','Cooking spray'],steps:['Preheat 425°F. Wire rack on foil-lined sheet pan. Spray well.','Pound chicken to even ¾-inch.','Mix panko, parmesan, garlic powder, Italian seasoning, salt, pepper.','Dip chicken in egg, press firmly into panko mixture both sides. Place on rack.','Toss broccoli with oil, salt, pepper on second pan.','Bake chicken 25–30 min until deep golden and 165°F. Do not open oven first 20 min.','Roast broccoli 15–18 min at same temp.'],macros:{calories:630,protein:77,carbs:18,fat:28},estimatedCost:14,bloodSugarNote:'Lowest-carb oven meal. Excellent blood sugar choice. Parmesan adds significant protein beyond the chicken.'},
+'honey-garlic-baked-chicken':{name:'Honey Garlic Baked Chicken',method:'oven',prepTime:15,cookTime:45,servings:4,ingredients:['2.5 lbs boneless skinless chicken thighs','1.5 lbs baby potatoes, halved','¼ cup honey','3 tbsp soy sauce','6 cloves garlic, minced','2 tbsp butter','1 tbsp rice vinegar','1 tbsp olive oil','1 tsp salt','½ tsp black pepper'],steps:['Preheat 400°F.','Make sauce: melt butter, add garlic 2 min, add honey/soy/vinegar, simmer 3 min. Divide.','Toss potatoes with oil, half the salt. Roast 15 min alone.','Season chicken. Push potatoes aside, add chicken. Pour ⅔ sauce over everything.','Bake 30–35 min. Baste at 15 min mark. Done at 165°F.','Drizzle reserved sauce before serving.'],macros:{calories:660,protein:68,carbs:50,fat:22},estimatedCost:12,bloodSugarNote:'Baby potatoes have lower GI than large. Honey is ~1 tbsp per serving — not a large sugar load with this much protein.'},
+'sheet-pan-chicken-broccoli':{name:'Sheet Pan Chicken and Broccoli',method:'oven',prepTime:10,cookTime:35,servings:4,ingredients:['2.5 lbs boneless skinless chicken thighs','5 cups broccoli florets','4 cloves garlic, minced','3 tbsp olive oil','2 tbsp soy sauce','1 tbsp lemon juice','1 tsp smoked paprika','1 tsp garlic powder','1 tsp Italian seasoning','1 tsp salt','½ tsp black pepper','1½ cups dry brown rice','Freshly grated parmesan'],steps:['Cook rice.','Preheat 425°F. Line large sheet pan.','Whisk oil, soy sauce, lemon, garlic, spices.','Toss chicken in marinade. Toss broccoli with remaining marinade.','Arrange on sheet pan.','Roast 25–30 min until chicken is 165°F and broccoli has charred edges.','Serve over rice with parmesan.'],macros:{calories:620,protein:72,carbs:50,fat:18},estimatedCost:12,bloodSugarNote:'Broccoli is rich in chromium, which helps regulate blood sugar. High vegetable ratio. Reheats well.'},
+'sheet-pan-salmon-asparagus':{name:'Sheet Pan Salmon and Asparagus',method:'oven',prepTime:10,cookTime:15,servings:4,ingredients:['1.5 lbs salmon fillets, 4 portions (~6 oz each)','2 bunches asparagus (~1.5 lbs), tough ends snapped off','4 cloves garlic, minced','3 tbsp olive oil, divided','Juice of 2 lemons','Zest of 1 lemon','1½ tsp garlic powder','1 tsp salt','½ tsp black pepper','Fresh dill or parsley','1½ cups dry brown rice'],steps:['Cook rice.','Preheat 400°F. Line large sheet pan.','Toss asparagus with 1½ tbsp oil, ½ tsp salt, pepper. Spread on pan.','Pat salmon dry. Place alongside asparagus.','Mix remaining oil, lemon juice, zest, garlic, garlic powder, ½ tsp salt. Spoon over salmon.','Bake 12–15 min until salmon flakes easily.','Serve over rice. Garnish with dill or parsley.'],macros:{calories:600,protein:52,carbs:46,fat:22},estimatedCost:16,bloodSugarNote:'Asparagus contains inulin that improves insulin sensitivity. Omega-3s in salmon also improve insulin sensitivity over time.'},
+'baked-cod-broccoli':{name:'Baked Cod with Rice and Broccoli',method:'oven',prepTime:10,cookTime:20,servings:4,ingredients:['1.5 lbs cod fillets, 4 portions','3 cups broccoli florets','1½ cups dry brown rice','4 cloves garlic, minced','3 tbsp butter, melted','Juice of 2 lemons','1 tsp garlic powder','1 tsp smoked paprika','1 tsp dried parsley','1 tsp salt','½ tsp black pepper','Lemon slices for garnish'],steps:['Cook rice.','Preheat 400°F. Line baking dish with foil.','Toss broccoli with 1 tbsp butter, ¼ tsp salt, pepper.','Pat cod dry. Place on pan with broccoli.','Mix remaining butter, garlic, lemon juice, spices. Pour over cod.','Bake 15–18 min until cod flakes easily.','Serve over rice.'],macros:{calories:520,protein:48,carbs:50,fat:12},estimatedCost:14,bloodSugarNote:'Lighter protein meal (~48g). Have hard-boiled egg or Greek yogurt to hit daily goals. Low fat means slightly faster digestion.'},
+'turkey-meatballs-pasta':{name:'Turkey Meatballs and Pasta',method:'oven',prepTime:20,cookTime:30,servings:4,ingredients:['2 lbs 93/7 ground turkey','⅔ cup Italian breadcrumbs','½ cup freshly grated parmesan','2 large eggs','5 cloves garlic, minced','1 tbsp Italian seasoning','1 tsp salt','½ tsp black pepper','2 tbsp fresh parsley, chopped','12 oz spaghetti or penne','1 jar (24 oz) marinara sauce','Extra parmesan','Cooking spray'],steps:['Preheat 400°F. Foil-lined sheet pan, spray well.','Mix turkey, breadcrumbs, parmesan, eggs, garlic, seasoning, parsley. Do not overmix.','Roll into 1½-inch balls (~20–22). Bake 20–22 min until 165°F.','Cook pasta to al dente. Reserve ½ cup pasta water. Drain.','Simmer marinara. Add meatballs, simmer together 5–10 min.','Serve pasta with meatballs and sauce. Add pasta water if needed. Finish with parmesan.'],macros:{calories:690,protein:65,carbs:62,fat:18},estimatedCost:13,bloodSugarNote:'Al dente pasta has lower GI. Meatball protein and parmesan fat buffer the pasta glycemic load.'},
+'sheet-pan-sausage-potatoes':{name:'Sheet Pan Sausage and Potatoes',method:'oven',prepTime:10,cookTime:40,servings:4,ingredients:['1.5 lbs smoked beef or pork sausage, sliced ½-inch','2 lbs baby potatoes, halved','4 cloves garlic, minced','3 tbsp olive oil','1 tsp smoked paprika','1 tsp garlic powder','1 tsp Italian seasoning','1 tsp salt','½ tsp black pepper','Dijon mustard for dipping'],steps:['Preheat 425°F. Foil-lined large sheet pan.','Toss potatoes with 2 tbsp oil, spices. Spread on pan. Roast alone 20 min.','Toss sausage with remaining oil and garlic.','Flip potatoes. Add sausage to pan.','Roast 15–20 more min until sausage is caramelized and potatoes are crispy.','Serve with Dijon mustard.'],macros:{calories:640,protein:28,carbs:36,fat:44},estimatedCost:11,bloodSugarNote:'High fat = very slow digestion, stable blood sugar. Lower protein — add 4 hard-boiled eggs on the side.'},
+'sweet-potato-chicken-bake':{name:'Sweet Potato and Chicken Bake',method:'oven',prepTime:15,cookTime:50,servings:4,ingredients:['2.5 lbs boneless skinless chicken thighs','2 large sweet potatoes, peeled and cut into 1-inch cubes','5 cloves garlic, minced','3 tbsp olive oil, divided','2 tbsp honey','1 tbsp soy sauce','1 tsp smoked paprika','1 tsp garlic powder','1 tsp dried rosemary','1 tsp salt','½ tsp black pepper'],steps:['Preheat 400°F. Foil-lined 9×13 or large sheet pan.','Toss sweet potato with 1½ tbsp oil, ¼ tsp salt. Roast 15 min alone.','Whisk remaining oil, honey, soy sauce, garlic, spices.','Toss chicken in honey mixture.','Arrange chicken over and around sweet potatoes. Pour remaining sauce over everything.','Bake 30–35 min. Baste at 20 min. Done at 165°F.','Rest 5 min. Spoon pan juices over everything.'],macros:{calories:640,protein:68,carbs:38,fat:22},estimatedCost:12,bloodSugarNote:'Sweet potatoes have much lower GI than white potatoes. Rich in fiber and beta-carotene. The one sweet potato recipe in the rotation — enjoy it.'},
+'pulled-chicken':{name:'Slow Cooker Pulled Chicken',method:'crockpot',prepTime:10,cookTime:360,servings:4,ingredients:['3 lbs boneless skinless chicken thighs','1 cup BBQ sauce (lower-sugar like Stubb\'s)','½ cup chicken broth','4 cloves garlic, minced','1 tsp smoked paprika','1 tsp cumin','1 tsp garlic powder','1 tsp salt','½ tsp black pepper','1½ cups dry brown rice','Extra BBQ sauce for serving'],steps:['Mix garlic, spices together.','Place chicken in slow cooker. Sprinkle spice mix over.','Pour broth then BBQ sauce over. Do not stir.','Cook LOW 6–8 hours or HIGH 3–4 hours until chicken shreds easily.','Shred with two forks in slow cooker. Stir into juices.','Cook brown rice when ready to serve.','Serve over rice with extra BBQ sauce.'],macros:{calories:620,protein:75,carbs:45,fat:14},estimatedCost:11,bloodSugarNote:'Choose Stubb\'s or lower-sugar BBQ sauce. High protein compensates. Pile chicken high and go light on extra sauce.'},
+'beef-stew':{name:'Slow Cooker Beef Stew',method:'crockpot',prepTime:20,cookTime:480,servings:4,ingredients:['2.5 lbs beef chuck roast, cut into 1½-inch cubes','1.5 lbs Yukon Gold potatoes, quartered','3 large carrots, peeled and sliced ½-inch','3 celery stalks, sliced ½-inch','5 cloves garlic, minced','3 cups beef broth','2 tbsp tomato paste','1 tbsp Worcestershire sauce','1 tsp Italian seasoning','1 tsp smoked paprika','1 tsp salt','½ tsp black pepper','3 tbsp cornstarch + 3 tbsp cold water','Fresh parsley'],steps:['Cut chuck into 1½-inch cubes. Season with salt and pepper.','Optional but recommended: sear beef in batches in HOT oil 2 min per side. Add to slow cooker.','Add potatoes, carrots, celery, garlic.','Whisk broth, tomato paste, Worcestershire, seasoning. Pour over everything.','Cook LOW 8–10 hours or HIGH 5–6 hours until beef falls apart.','Mix cornstarch and cold water. Stir in. Cook HIGH uncovered 20–30 min until gravy thickens.','Taste, adjust salt. Serve with parsley.'],macros:{calories:580,protein:55,carbs:32,fat:24},estimatedCost:13,bloodSugarNote:'Slow-cooked root vegetables have lower GI than roasted. Thick stew = slow digestion = stable blood sugar.'},
+'pork-carnitas':{name:'Slow Cooker Pork Carnitas',method:'crockpot',prepTime:15,cookTime:300,servings:4,ingredients:['3 lbs pork shoulder (Boston butt), cut into 2-inch cubes','10 cloves garlic, smashed','2 small cinnamon sticks','½ tbsp dried oregano','½ tbsp cumin','½ tsp salt','½ tsp chipotle powder','Freshly cracked black pepper','2 small oranges (zest of 1, juice of both ~½ cup)','1½ cups dry brown rice','2 avocados, sliced','½ cup sour cream','Juice of 2 limes','¼ cup fresh cilantro'],steps:['Place smashed garlic and cinnamon sticks in slow cooker bottom.','Mix oregano, cumin, salt, chipotle, pepper. Coat pork cubes.','Add pork on top of garlic. Pour orange juice over, add zest strips.','Cook HIGH 5 hours or LOW 8–9 hours until fork-tender.','Remove cinnamon sticks. Shred pork in slow cooker.','For crispy edges: cook shredded pork with juices in cast iron over medium-high 3–4 min without stirring.','Cook rice. Serve carnitas over rice with avocado, sour cream, lime, cilantro.'],macros:{calories:680,protein:52,carbs:48,fat:28},estimatedCost:11,bloodSugarNote:'Pork shoulder fat slows digestion naturally. The crispy step is worth it for significantly better flavor.'},
+'chicken-noodle-soup':{name:'Slow Cooker Chicken Noodle Soup',method:'crockpot',prepTime:10,cookTime:420,servings:4,ingredients:['2.5 lbs boneless skinless chicken thighs','3 large carrots, peeled and sliced','3 celery stalks, sliced','5 cloves garlic, minced','6 cups chicken broth','1 tsp dried thyme','1 tsp dried parsley','1 tsp garlic powder','1 tsp salt','½ tsp black pepper','8 oz wide egg noodles','Juice of 1 lemon','Fresh parsley'],steps:['Place chicken, carrots, celery, garlic in slow cooker.','Pour in broth. Add thyme, parsley, garlic powder, salt, pepper.','Cook LOW 7–8 hours or HIGH 3–4 hours.','Remove chicken, shred with two forks. Return to slow cooker.','Taste and adjust salt.','Add egg noodles. Cook on HIGH 15–20 min until tender — check at 12 min.','Squeeze lemon juice in. Stir.','Serve with fresh parsley.'],macros:{calories:490,protein:60,carbs:32,fat:12},estimatedCost:11,bloodSugarNote:'Chicken broth itself can help stabilize blood sugar. Lower calorie — add whole grain bread or extra chicken if needed.'},
+'white-bean-sausage-soup':{name:'White Bean and Sausage Soup',method:'crockpot',prepTime:10,cookTime:360,servings:4,ingredients:['1.5 lbs smoked beef or pork sausage, sliced into coins','3 cans (15 oz each) white cannellini beans, drained and rinsed','5 cups chicken broth','5 cloves garlic, minced','3 cups fresh baby spinach','1 tsp Italian seasoning','1 tsp garlic powder','½ tsp smoked paprika','Parmesan rind (optional)','Salt and pepper to taste','Freshly grated parmesan for serving'],steps:['Optional: brown sausage coins in skillet 3 min per side.','Add sausage, beans, garlic, broth, seasonings, and parmesan rind to slow cooker.','Cook LOW 6–8 hours or HIGH 3–4 hours.','Remove rind. Mash some beans against the side to thicken.','Add spinach. Cook HIGH 10–15 min until wilted.','Season to taste. Serve topped with parmesan.'],macros:{calories:550,protein:38,carbs:42,fat:22},estimatedCost:11,bloodSugarNote:'White beans have resistant starch that dramatically slows glucose absorption. Spinach adds magnesium for insulin sensitivity.'},
+'turkey-chili':{name:'Slow Cooker Turkey Chili',method:'crockpot',prepTime:15,cookTime:360,servings:4,ingredients:['2 lbs 93/7 ground turkey','2 cans (15 oz each) kidney beans, drained','1 can (15 oz) black beans, drained','1 can (28 oz) crushed tomatoes','1 can (14.5 oz) diced tomatoes','5 cloves garlic, minced','2 tbsp chili powder','1 tsp cumin','1 tsp smoked paprika','1 tsp garlic powder','1 tsp salt','½ tsp dried oregano','Toppings: shredded cheddar, sour cream, fresh cilantro'],steps:['Brown turkey in skillet 8–10 min. Drain.','Transfer to slow cooker with beans, tomatoes, garlic, all spices.','Cook LOW 6–8 hours or HIGH 3–4 hours.','Stir, taste, adjust salt.','Serve topped with cheddar and sour cream.'],macros:{calories:590,protein:65,carbs:48,fat:16},estimatedCost:12,bloodSugarNote:'Excellent reactive hypoglycemia meal — three types of beans + lean turkey = very high fiber and protein. Sustained energy for hours.'},
+'honey-garlic-pork-loin':{name:'Honey Garlic Pork Loin',method:'crockpot',prepTime:10,cookTime:360,servings:4,ingredients:['2 lbs pork loin roast','1.5 lbs baby potatoes, halved','¼ cup honey','3 tbsp soy sauce','6 cloves garlic, minced','1 tbsp rice vinegar','1 tsp Dijon mustard','1 tsp garlic powder','1 tsp smoked paprika','1 tsp salt','½ tsp black pepper','1 lb green beans (fresh or frozen)'],steps:['Mix honey, soy sauce, garlic, vinegar, Dijon.','Season pork with garlic powder, paprika, salt, pepper.','Add potatoes to slow cooker. Pour half the sauce over, stir.','Place pork on top. Pour remaining sauce over pork.','Cook LOW 6–7 hours or HIGH 3–3.5 hours. Done at 145°F internal.','Rest pork 10 min under foil before slicing.','Steam green beans: microwave with 2 tbsp water covered 4 min.','Slice pork, serve over potatoes with sauce. Green beans on side.'],macros:{calories:560,protein:52,carbs:48,fat:14},estimatedCost:12,bloodSugarNote:'Pork loin is one of the leanest meats. Honey is ~1 tbsp per person. Eat at consistent times.'},
+'chicken-potato-soup':{name:'Chicken and Potato Soup',method:'crockpot',prepTime:15,cookTime:450,servings:4,ingredients:['2.5 lbs boneless skinless chicken thighs','2 lbs Yukon Gold potatoes, diced 1-inch','3 celery stalks, sliced','3 large carrots, sliced','5 cloves garlic, minced','5 cups chicken broth','1 cup heavy cream or whole milk','1 tsp garlic powder','1 tsp dried thyme','1 tsp salt','½ tsp black pepper','2 tbsp cornstarch + 2 tbsp cold water','1 cup shredded cheddar','Fresh parsley'],steps:['Place chicken, potatoes, celery, carrots, garlic in slow cooker.','Pour broth. Add garlic powder, thyme, salt, pepper.','Cook LOW 7–8 hours or HIGH 4 hours.','Remove chicken. Shred. Return to slow cooker.','Mix cornstarch + cold water. Stir in. Add cream or milk.','Cook HIGH 20–30 min uncovered until thickened.','Season to taste. Serve topped with cheddar and parsley.'],macros:{calories:620,protein:62,carbs:38,fat:24},estimatedCost:12,bloodSugarNote:'Chicken protein and cream fat buffer potato glycemic load. Very filling. Reheats well for lunch.'}
+};
+
+// ── BASE ROTATION (corrected — chicken-noodle-soup at index 32) ──
+const BASE_ROTATION = [
+'honey-garlic-chicken-skillet','turkey-taco-bowl','baked-chicken-potatoes',
+'beef-potato-skillet','teriyaki-chicken-bowl','sheet-pan-sausage-potatoes',
+'pulled-chicken','chicken-black-bean-skillet','turkey-rice-skillet',
+'parmesan-crusted-chicken','sesame-ginger-beef','cilantro-lime-chicken-bowl',
+'pork-carnitas','ground-beef-rice-bowl','greek-chicken-bowl',
+'sheet-pan-chicken-broccoli','beef-taco-bowl','egg-turkey-sausage-scramble',
+'beef-stew','chipotle-chicken-bowl','turkey-potato-skillet',
+'honey-garlic-baked-chicken','sesame-ginger-chicken','salmon-rice-bowl',
+'turkey-chili','pork-tenderloin-medallions','chicken-stir-fry',
+'sweet-potato-chicken-bake','shrimp-fried-rice','white-bean-sausage-soup',
+'chicken-rice-skillet','turkey-meatballs-pasta','chicken-noodle-soup',
+'lemon-garlic-shrimp-pasta','baked-cod-broccoli','sausage-potato-hash',
+'honey-garlic-pork-loin','tuna-noodle-skillet','sheet-pan-salmon-asparagus',
+'chicken-potato-soup'
+];
+
+// ── LOCAL STORAGE ──────────────────────────────────────────
+// Supabase sync
+const SUPA_URL='https://xlbhtzywwltdicsyhdxa.supabase.co';
+const SUPA_KEY='sb_publishable_sKlf4S-BNRXE7SdLGfIBAg_o-BcN7LO';
+let sb=null;
+function initSupabase(){
+  try{sb=window.supabase.createClient(SUPA_URL,SUPA_KEY);}catch(e){sb=null;}
+}
+async function supaLoad(key,def){
+  if(!sb)return def;
+  try{
+    const{data,error}=await sb.from('mealplan_state').select('value').eq('key',key).single();
+    if(error||!data)return def;
+    return data.value;
+  }catch{return def;}
+}
+async function supaSet(key,val){
+  if(!sb)return;
+  try{await sb.from('mealplan_state').upsert({key,value:val,updated_at:new Date().toISOString()});}catch{}
+}
+function subscribeRealtime(){
+  if(!sb)return;
+  sb.channel('mealplan').on('postgres_changes',{event:'UPDATE',schema:'public',table:'mealplan_state'},payload=>{
+    const{key,value}=payload.new;
+    try{localStorage.setItem(key,JSON.stringify(value));}catch{}
+    rerenderAll();
+  }).subscribe();
+}
+function rerenderAll(){
+  renderCalendar();
+  renderMeals();
+  if(document.getElementById('sec-shopping').classList.contains('active')){
+    renderShopTabs();renderShopToggle();renderShopItems();
+  }
+}
+
+const LS = {
+  rot:'mealplan_rotation', muted:'mealplan_muted',
+  custom:'mealplan_custom_meals', ins:'mealplan_insertions',
+  shop:'mealplan_shop_checked'
+};
+function lsGet(k,d){try{const v=localStorage.getItem(k);return v?JSON.parse(v):d}catch{return d}}
+function lsSet(k,v){try{localStorage.setItem(k,JSON.stringify(v))}catch{}supaSet(k,v);}
+function initStorage(){if(!localStorage.getItem(LS.rot))lsSet(LS.rot,[...BASE_ROTATION])}
+async function syncFromSupabase(){
+  const keys=Object.values(LS);
+  await Promise.all(keys.map(async k=>{
+    const remote=await supaLoad(k,null);
+    if(remote!==null)try{localStorage.setItem(k,JSON.stringify(remote));}catch{}
+  }));
+}
+
+function getRotation(){return lsGet(LS.rot,[...BASE_ROTATION])}
+function getMutedSet(){return new Set(lsGet(LS.muted,[]))}
+function getActiveRot(){const m=getMutedSet();return getRotation().filter(id=>!m.has(id))}
+function getAllMeals(){return Object.assign({},MEALS,lsGet(LS.custom,{}))}
+
+// ── DATE UTILS ─────────────────────────────────────────────
+function d0(d){const r=new Date(d);r.setHours(0,0,0,0);return r}
+function sameDay(a,b){return d0(a).getTime()===d0(b).getTime()}
+function isToday(d){return sameDay(d,new Date())}
+function getMondayOf(d){
+  const dt=d0(d),day=dt.getDay();
+  dt.setDate(dt.getDate()-(day===0?6:day-1));
+  return dt;
+}
+function fmtKey(d){const dt=d0(d);return`${dt.getFullYear()}${String(dt.getMonth()+1).padStart(2,'0')}${String(dt.getDate()).padStart(2,'0')}`}
+function fmtShort(d,opts={}){return d0(d).toLocaleDateString('en-US',{month:'short',day:'numeric',...opts})}
+function fmtMon(d){return d0(d).toLocaleDateString('en-US',{month:'short',year:'numeric'})}
+
+// ── SCHEDULING ─────────────────────────────────────────────
+function isBulkSunday(d){
+  const diff=Math.round((d0(d)-d0(FIRST_BULK_SUNDAY))/86400000);
+  return diff>=0&&diff%BULK_INTERVAL===0;
+}
+function getUpcomingBulkSundays(n=3){
+  const today=d0(new Date()),first=d0(FIRST_BULK_SUNDAY),res=[];
+  const elapsed=Math.max(0,Math.floor(Math.round((today-first)/86400000)/BULK_INTERVAL));
+  let cur=new Date(first);cur.setDate(cur.getDate()+elapsed*BULK_INTERVAL);
+  if(cur<today)cur.setDate(cur.getDate()+BULK_INTERVAL);
+  while(res.length<n){res.push(d0(cur));cur.setDate(cur.getDate()+BULK_INTERVAL)}
+  return res;
+}
+function getNextBulkSunday(){return getUpcomingBulkSundays(1)[0]}
+function getEarliestAddDate(){const ns=getNextBulkSunday();ns.setDate(ns.getDate()+1);return ns}
+
+const DAY_NAMES=['Monday','Tuesday','Wednesday','Thursday','Friday','Saturday','Sunday'];
+function getMealsForWeek(mon){
+  const rot=getActiveRot(),allM=getAllMeals();
+  const start=d0(ROTATION_START),ws=d0(mon);
+  const days=Array.from({length:7},(_,i)=>{const d=new Date(ws);d.setDate(d.getDate()+i);return d});
+  // Step 1: base rotation
+  let ids=days.map(d=>{
+    const diff=Math.round((d0(d)-start)/86400000);
+    return diff<0?null:rot[((diff%rot.length)+rot.length)%rot.length];
+  });
+  // Apply forced insertions
+  const ins=lsGet(LS.ins,[]);
+  days.forEach((d,i)=>{
+    const key=fmtKey(d),hit=ins.find(x=>x.firstDate===key);
+    if(hit)ids[i]=hit.id;
+  });
+  // Step 2: crockpot swap
+  const crockWD=[],nonCrockWE=[];
+  for(let i=0;i<5;i++)if(ids[i]&&allM[ids[i]]?.method==='crockpot')crockWD.push(i);
+  for(let i=5;i<7;i++)if(ids[i]&&allM[ids[i]]?.method!=='crockpot')nonCrockWE.push(i);
+  const swaps=Math.min(crockWD.length,nonCrockWE.length);
+  for(let s=0;s<swaps;s++){[ids[crockWD[s]],ids[nonCrockWE[s]]]=[ids[nonCrockWE[s]],ids[crockWD[s]]]}
+  // Step 3: remaining crockpot weekday → Saturday prep
+  let preppedIdx=-1,prepForDay=null;
+  for(let i=0;i<5;i++){
+    if(ids[i]&&allM[ids[i]]?.method==='crockpot'){
+      preppedIdx=i;prepForDay=DAY_NAMES[i];
+      ids[5]=ids[i]; // Saturday shows the crockpot recipe
+      break;
+    }
+  }
+  // Step 4: 14-day no-repeat (skip the prepped weekday slot)
+  for(let i=0;i<7;i++){
+    if(!ids[i]||i===preppedIdx)continue;
+    const used=new Set();
+    for(let b=1;b<=13;b++){
+      const prev=new Date(days[i]);prev.setDate(prev.getDate()-b);
+      const diff=Math.round((d0(prev)-start)/86400000);
+      if(diff>=0)used.add(rot[((diff%rot.length)+rot.length)%rot.length]);
+    }
+    if(used.has(ids[i])){const rep=rot.find(x=>!used.has(x));if(rep)ids[i]=rep}
+  }
+  return ids.map((id,i)=>({
+    date:days[i],id,
+    isPreppedWeekday:i===preppedIdx,
+    isPrepDay:i===5&&preppedIdx>=0,
+    prepForDay:i===5?prepForDay:null
+  }));
+}
+function getMealForDate(d){
+  const mon=getMondayOf(d),week=getMealsForWeek(mon);
+  return week.find(w=>sameDay(w.date,d))||{date:d,id:null};
+}
+
+// ── SHOPPING LIST ──────────────────────────────────────────
+const LOCAL_KW=['cilantro','parsley','dill','thyme','rosemary','chive','ginger','avocado','lemon','lime','asparagus','green bean','green onion','scallion','cucumber','celery'];
+function isLocal(s){const l=s.toLowerCase();return LOCAL_KW.some(k=>l.includes(k))}
+// Canned & Pantry checked FIRST so "chicken broth" doesn't land in Proteins,
+// "rice vinegar" doesn't land in Grains, "garlic powder" doesn't land in Produce
+const SAMS_CATS={
+  'Canned & Pantry':['broth','bean','tomato','cream of','marinara','cornstarch','vinegar','oil','mustard','worcestershire','bbq','oyster sauce','brown sugar','chili powder','paprika','cumin','oregano','seasoning','garlic powder','onion powder','cayenne','cinnamon','chipotle'],
+  'Proteins':['chicken thigh','chicken breast','ground beef','ground turkey','pork shoulder','pork loin','pork tenderloin','salmon','cod','tuna','shrimp','sausage','chuck roast','albacore'],
+  'Dairy & Eggs':['egg','butter','sour cream','heavy cream','whole milk','cheese','parmesan','feta','mozzarella','cheddar'],
+  'Grains & Pasta':['brown rice','white rice','egg noodle','spaghetti','linguine','penne','breadcrumb','panko'],
+  'Oils & Condiments':['honey','soy sauce','sesame oil','cooking oil','olive oil','rice vinegar','bbq sauce','dijon'],
+  'Produce':['potato','broccoli','carrot','spinach','orange'],
+  'Other':[]
+};
+const LOCAL_CATS={
+  'Fresh Herbs':['cilantro','parsley','dill','thyme','rosemary','chive'],
+  'Citrus':['lemon','lime'],
+  'Fresh Produce':['asparagus','green bean','green onion','scallion','cucumber','celery','ginger','avocado'],
+  'Other':[]
+};
+function catIngredient(s,storeType){
+  const l=s.toLowerCase();
+  const cats=storeType==='local'?LOCAL_CATS:SAMS_CATS;
+  for(const [cat,kws] of Object.entries(cats)){
+    if(cat==='Other')continue;
+    if(kws.some(k=>l.includes(k)))return cat;
+  }
+  return'Other';
+}
+function normQty(s){
+  return s.replace(/½/g,'.5').replace(/¼/g,'.25').replace(/¾/g,'.75')
+    .replace(/⅓/g,'.333').replace(/⅔/g,'.667').replace(/⅛/g,'.125');
+}
+const UNIT_NORM={'lbs':'lbs','lb':'lbs','oz':'oz','tbsp':'tbsp','tsp':'tsp',
+  'cups':'cup','cup':'cup','cans':'can','can':'can','cloves':'clove','clove':'clove',
+  'bunches':'bunch','bunch':'bunch','stalks':'stalk','stalk':'stalk',
+  'jars':'jar','jar':'jar','bags':'bag','bag':'bag','pkg':'pkg'};
+function parseIng(raw){
+  const s=normQty(raw.trim());
+  const m=s.match(/^(\d*\.?\d+)?\s*(lbs?|oz|cups?|tbsp|tsp|cans?|cloves?|bunches?|stalks?|jars?|bags?|pkg)?\s+(.+)$/i);
+  if(m){const u=(m[2]||'').toLowerCase();return{qty:parseFloat(m[1]||'1'),unit:UNIT_NORM[u]||u,name:m[3].trim()}}
+  return{qty:1,unit:'',name:raw.trim()};
+}
+const NO_PLURAL=new Set(['tbsp','tsp','oz','lbs']);
+function fmtUnit(unit,qty){
+  if(!unit)return'';
+  if(NO_PLURAL.has(unit))return unit;
+  if(qty<=1)return unit;
+  if(unit==='bunch')return'bunches';
+  return unit+'s';
+}
+function normName(n){
+  return n.toLowerCase()
+    .replace(/\bboneless\s+skinless\b/g,'')
+    .replace(/\b(?:fresh|frozen|dry|dried|minced|grated|roughly\s+chopped|chopped|sliced|diced|peeled|trimmed|shredded|crushed|cooked|thawed|day-old|long-grain)\b/g,'')
+    .replace(/\b(?:93\/7|80\/20)\b/g,'')
+    .replace(/\(.*?\)/g,'').replace(/,.*$/,'').replace(/\bor\b.*$/,'')
+    .replace(/\s+/g,' ').trim();
+}
+function generateShoppingList(startDate,numDays,storeType){
+  const allM=getAllMeals();
+  const grouped={};
+  for(let i=0;i<numDays;i++){
+    const d=new Date(startDate);d.setDate(d.getDate()+i);
+    const info=getMealForDate(d);
+    if(!info?.id)continue;
+    const meal=allM[info.id];if(!meal)continue;
+    for(const ing of meal.ingredients){
+      const local=isLocal(ing);
+      if(storeType==='local'&&!local)continue;
+      if(storeType==='sams'&&local)continue;
+      const {qty,unit,name}=parseIng(ing);
+      const key=normName(name);
+      if(!grouped[key]){grouped[key]={display:name,qty:0,unit,count:0,meals:new Set()}}
+      grouped[key].qty+=qty;grouped[key].count++;grouped[key].meals.add(meal.name);
+      if(!grouped[key].unit&&unit)grouped[key].unit=unit;
+    }
+  }
+  const cats={};
+  for(const[key,item]of Object.entries(grouped)){
+    const cat=catIngredient(item.display,storeType);
+    if(!cats[cat])cats[cat]=[];
+    const q=Math.round(item.qty*10)/10;
+    const uStr=fmtUnit(item.unit,q);
+    const qStr=item.unit?`${q} ${uStr}`:(q>1?`${Math.round(q)}`:'');
+    cats[cat].push({key,display:qStr?`${qStr} ${item.display}`:item.display,mealCt:item.meals.size});
+  }
+  const ORDER=storeType==='local'?['Fresh Herbs','Citrus','Fresh Produce','Other']:
+    ['Proteins','Dairy & Eggs','Grains & Pasta','Canned & Pantry','Produce','Other'];
+  return ORDER.filter(c=>cats[c]?.length).map(c=>({cat:c,items:cats[c]}));
+}
+
+// ── CALENDAR ───────────────────────────────────────────────
+let calStart=null; // first day of 7-card window
+function initCalStart(){
+  calStart=d0(new Date()); // today is card 1
+}
+function calNav(dir){
+  calStart=new Date(calStart);calStart.setDate(calStart.getDate()+dir*7);
+  renderCalendar();
+}
+function renderCalendar(){
+  const cards=document.getElementById('cal-cards');
+  const range=document.getElementById('cal-range');
+  const today=d0(new Date());
+  const days=Array.from({length:7},(_,i)=>{const d=new Date(calStart);d.setDate(d.getDate()+i);return d});
+  // Range label
+  const a=fmtShort(days[0]),b=fmtShort(days[6]);
+  range.textContent=`${a} – ${b}`;
+  // Build cards
+  cards.innerHTML='';
+  const ABBR=['SUN','MON','TUE','WED','THU','FRI','SAT'];
+  days.forEach((day,i)=>{
+    const info=getMealForDate(day);
+    const meal=info?.id?getAllMeals()[info.id]:null;
+    const isYest=i===0;
+    const isTod=sameDay(day,today);
+    const isBulk=isBulkSunday(day);
+    const isSun=day.getDay()===0;
+    // Rice prep note: next day is shrimp-fried-rice?
+    let showRicePrep=false;
+    if(i<6){
+      const nextInfo=getMealForDate(days[i+1]);
+      if(nextInfo?.id==='shrimp-fried-rice')showRicePrep=true;
+    }
+    const method=meal?.method||'';
+    const dotCls=method?`dot-${method}`:'dot-none';
+    const card=document.createElement('div');
+    card.className=`day-card${isTod?' is-today':''}${isYest?' is-yesterday':''}`;
+    if(meal)card.onclick=()=>openRecipeModal(info.id);
+    const badges=[];
+    if(isBulk)badges.push('<span class="badge badge-sams">SAM\'S</span>');
+    else if(isSun)badges.push('<span class="badge badge-shop">SHOP</span>');
+    if(info?.isPrepDay)badges.push(`<span class="badge badge-prep">PREP &#8594; ${info.prepForDay}</span>`);
+    if(info?.isPreppedWeekday)badges.push('<span class="badge badge-prepped">Prepped Sat</span>');
+    if(showRicePrep)badges.push('<span class="badge badge-rice">Prep rice tonight</span>');
+    const mealName=meal?meal.name:'—';
+    let subtitle=meal?`${meal.method.charAt(0).toUpperCase()+meal.method.slice(1)} · ${meal.prepTime+meal.cookTime} min`:'';
+    if(info?.isPreppedWeekday)subtitle='Prepped Saturday';
+    card.innerHTML=`
+      <div class="day-dot ${dotCls}"></div>
+      <div class="day-date">
+        <span class="day-abbr">${ABBR[day.getDay()]}</span>
+        <span class="day-num">${day.getDate()}</span>
+      </div>
+      <div class="day-info">
+        <div class="day-meal">${mealName}</div>
+        ${subtitle?`<div class="day-sub">${subtitle}</div>`:''}
+      </div>
+      <div class="day-badges">${badges.join('')}</div>`;
+    cards.appendChild(card);
+  });
+}
+
+// ── MEALS LIST ─────────────────────────────────────────────
+function renderMeals(){
+  const list=document.getElementById('meals-list');
+  list.innerHTML='';
+  const rot=getRotation(),muted=getMutedSet(),allM=getAllMeals();
+  rot.forEach((id,i)=>{
+    const m=allM[id];if(!m)return;
+    const isMuted=muted.has(id);
+    const div=document.createElement('div');
+    div.className=`meal-item${isMuted?' muted':''}`;
+    div.dataset.id=id;
+    div.innerHTML=`
+      <span class="drag-handle">&#8801;</span>
+      <span class="meal-num">${i+1}</span>
+      <span class="mbadge mbadge-${m.method}">${m.method==='stovetop'?'Stove':m.method==='oven'?'Oven':'Crock'}</span>
+      <div class="meal-info" onclick="openRecipeModal('${id}')">
+        <div class="meal-name">${m.name}</div>
+        <div class="meal-macros">${m.macros.calories} cal · ${m.macros.protein}g protein</div>
+      </div>
+      <div class="meal-acts">
+        <button class="act-btn${isMuted?' muted-on':''}" title="${isMuted?'Unmute':'Mute'}" onclick="toggleMute('${id}')">&#9679;</button>
+        <button class="act-btn del" title="Delete" onclick="deleteMeal('${id}')">&#10005;</button>
+      </div>`;
+    list.appendChild(div);
+  });
+  setupDragDrop();
+}
+function toggleMute(id){
+  const m=lsGet(LS.muted,[]);
+  const idx=m.indexOf(id);
+  if(idx>=0)m.splice(idx,1);else m.push(id);
+  lsSet(LS.muted,m);renderMeals();renderCalendar();
+}
+function deleteMeal(id){
+  if(!confirm(`Remove "${getAllMeals()[id]?.name||id}" from rotation?`))return;
+  const rot=getRotation().filter(x=>x!==id);
+  lsSet(LS.rot,rot);
+  const m=lsGet(LS.muted,[]).filter(x=>x!==id);lsSet(LS.muted,m);
+  renderMeals();renderCalendar();
+}
+
+// ── DRAG & DROP ────────────────────────────────────────────
+function setupDragDrop(){
+  const list=document.getElementById('meals-list');
+  let dragging=null;
+  list.addEventListener('touchstart',e=>{
+    if(!e.target.classList.contains('drag-handle'))return;
+    e.preventDefault();
+    dragging=e.target.closest('.meal-item');
+    dragging.classList.add('dragging');
+  },{passive:false});
+  list.addEventListener('touchmove',e=>{
+    if(!dragging)return;e.preventDefault();
+    const y=e.touches[0].clientY;
+    const items=[...list.querySelectorAll('.meal-item:not(.dragging)')];
+    let inserted=false;
+    for(const item of items){
+      const r=item.getBoundingClientRect();
+      if(y<r.top+r.height/2){list.insertBefore(dragging,item);inserted=true;break}
+    }
+    if(!inserted&&items.length)list.appendChild(dragging);
+  },{passive:false});
+  const done=()=>{
+    if(!dragging)return;
+    dragging.classList.remove('dragging');dragging=null;
+    const ids=[...list.querySelectorAll('.meal-item')].map(el=>el.dataset.id);
+    lsSet(LS.rot,ids);
+    list.querySelectorAll('.meal-num').forEach((el,i)=>el.textContent=i+1);
+  };
+  list.addEventListener('touchend',done);
+  list.addEventListener('touchcancel',done);
+}
+
+// ── SHOPPING ───────────────────────────────────────────────
+let shopPeriods=[],shopPeriodIdx=0,shopStore='local';
+function getUpcomingShoppingSundays(n=5){
+  const today=d0(new Date());
+  const dow=today.getDay();
+  const daysToSun=dow===0?0:7-dow;
+  let cur=new Date(today);cur.setDate(cur.getDate()+daysToSun);
+  const res=[];
+  while(res.length<n){res.push(d0(cur));cur.setDate(cur.getDate()+7)}
+  return res;
+}
+function initShoppingPeriods(){
+  shopPeriods=getUpcomingShoppingSundays(5);
+  // Default store: Sam's if first period is a bulk Sunday, otherwise local
+  shopStore=isBulkSunday(shopPeriods[0])?'sams':'local';
+}
+function renderShopTabs(){
+  const tabs=document.getElementById('shop-tabs');
+  tabs.innerHTML=shopPeriods.map((s,i)=>{
+    const bulk=isBulkSunday(s);
+    return`<button class="pill-tab${i===shopPeriodIdx?' active':''}" onclick="setShopPeriod(${i})">
+      ${fmtShort(s)}${bulk?' <span style="font-size:9px;opacity:.8">+SAM\'S</span>':''}
+    </button>`;
+  }).join('');
+}
+function renderShopToggle(){
+  const bulk=isBulkSunday(shopPeriods[shopPeriodIdx]);
+  // If this week isn't a bulk week, force local store
+  if(!bulk)shopStore='local';
+  const samsDim=!bulk;
+  document.getElementById('shop-store-toggle').innerHTML=`
+    <button class="store-btn${shopStore==='sams'?' active':''}"
+      style="${samsDim?'opacity:.35;cursor:default':''}"
+      onclick="${bulk?"setShopStore('sams')":''}">Sam's Club</button>
+    <button class="store-btn${shopStore==='local'?' active':''}" onclick="setShopStore('local')">Local Store</button>`;
+}
+function setShopPeriod(i){shopPeriodIdx=i;renderShopTabs();renderShopToggle();renderShopItems()}
+function setShopStore(s){shopStore=s;renderShopToggle();renderShopItems()}
+function getShopKey(){
+  const s=shopPeriods[shopPeriodIdx];
+  return`${fmtKey(s)}_${shopStore}`;
+}
+function renderShopItems(){
+  const period=shopPeriods[shopPeriodIdx];
+  // Start date = Monday after the bulk Sunday
+  const start=new Date(period);start.setDate(start.getDate()+1);
+  const numDays=shopStore==='sams'?14:7;
+  const groups=generateShoppingList(start,numDays,shopStore);
+  const checked=lsGet(LS.shop,{});
+  const key=getShopKey();
+  const checkedForPeriod=checked[key]||{};
+  const container=document.getElementById('shop-items');
+  if(!groups.length){container.innerHTML='<p style="color:var(--t3);padding:20px 0;text-align:center">No meals scheduled for this period.</p>';return}
+  container.innerHTML=groups.map(g=>`
+    <div class="shop-category">
+      <div class="shop-cat-title">${g.cat}</div>
+      ${g.items.map(item=>{
+        const isChk=!!checkedForPeriod[item.key];
+        return`<div class="shop-item${isChk?' checked':''}" onclick="toggleShopItem('${item.key.replace(/'/g,"\\'")}')">
+          <div class="shop-chk"></div>
+          <span class="shop-item-text">${item.display}</span>
+          ${item.mealCt>1?`<span class="shop-meal-ct">×${item.mealCt}</span>`:''}
+        </div>`;
+      }).join('')}
+    </div>`).join('');
+}
+function toggleShopItem(key){
+  const checked=lsGet(LS.shop,{});
+  const pkey=getShopKey();
+  if(!checked[pkey])checked[pkey]={};
+  if(checked[pkey][key])delete checked[pkey][key];
+  else checked[pkey][key]=true;
+  lsSet(LS.shop,checked);
+  renderShopItems();
+}
+function resetShopList(){
+  const checked=lsGet(LS.shop,{});
+  delete checked[getShopKey()];
+  lsSet(LS.shop,checked);
+  renderShopItems();
+}
+
+// ── RECIPE MODAL ───────────────────────────────────────────
+function openRecipeModal(id){
+  const m=getAllMeals()[id];if(!m)return;
+  const body=document.getElementById('modal-recipe-body');
+  const totalTime=m.prepTime+m.cookTime;
+  const methodLabel=m.method==='stovetop'?'Stovetop':m.method==='oven'?'Oven':'Crockpot';
+  body.innerHTML=`
+    <div class="rm-title">${m.name}</div>
+    <div class="rm-meta">
+      <span class="mbadge mbadge-${m.method}">${methodLabel}</span>
+      <span style="color:var(--t3);font-size:14px">Prep ${m.prepTime}m · Cook ${m.cookTime}m · Total ${totalTime}m</span>
+      ${m.estimatedCost?`<span style="color:var(--green);font-size:14px">~$${m.estimatedCost}</span>`:''}
+    </div>
+    <div class="rm-macros">
+      <div class="macro-box"><div class="macro-val">${m.macros.calories}</div><div class="macro-lbl">Calories</div></div>
+      <div class="macro-box"><div class="macro-val">${m.macros.protein}g</div><div class="macro-lbl">Protein</div></div>
+      <div class="macro-box"><div class="macro-val">${m.macros.carbs}g</div><div class="macro-lbl">Carbs</div></div>
+      <div class="macro-box"><div class="macro-val">${m.macros.fat}g</div><div class="macro-lbl">Fat</div></div>
+    </div>
+    <div class="rm-sec">Ingredients</div>
+    ${m.ingredients.map(i=>`<div class="rm-ing">${i}</div>`).join('')}
+    <div class="rm-sec">Steps</div>
+    ${m.steps.map((s,i)=>`<div class="rm-step"><span class="step-n">${i+1}</span><span>${s}</span></div>`).join('')}
+    ${m.bloodSugarNote?`<div class="bs-box"><div class="bs-lbl">Blood Sugar Note</div>${m.bloodSugarNote}</div>`:''}`;
+  openModal('modal-recipe');
+}
+
+// ── ADD RECIPE MODAL ────────────────────────────────────────
+let addStep=1,addPickedDate=null,addCalMonth=null;
+function openAddModal(){
+  addStep=1;addPickedDate=null;
+  addCalMonth=new Date();addCalMonth.setDate(1);
+  renderAddModal();
+  openModal('modal-add');
+}
+function renderAddModal(){
+  const body=document.getElementById('modal-add-body');
+  if(addStep===1){
+    const earliest=getEarliestAddDate();
+    body.innerHTML=`
+      <h2 class="rm-title">Add Recipe</h2>
+      <p class="step-hint">Pick a start date (Monday ${fmtShort(earliest)} or later)</p>
+      <div class="mini-cal">
+        <div class="mini-cal-hdr">
+          <button class="mini-nav" onclick="addCalNav(-1)">&#8249;</button>
+          <span class="mini-cal-title">${fmtMon(addCalMonth)}</span>
+          <button class="mini-nav" onclick="addCalNav(1)">&#8250;</button>
+        </div>
+        <div class="mini-grid">${renderMiniCal(addCalMonth,earliest,addPickedDate)}</div>
+      </div>
+      <button class="save-btn" id="next-btn" onclick="addStep2()" ${addPickedDate?'':'disabled'}>Next</button>`;
+  } else {
+    body.innerHTML=`
+      <h2 class="rm-title">Recipe Details</h2>
+      <p class="step-hint">Starting ${fmtShort(addPickedDate)}</p>
+      <div class="form-group">
+        <label class="form-lbl">Recipe Name</label>
+        <input class="form-input" id="f-name" placeholder="e.g. Garlic Butter Chicken" autocomplete="off">
+      </div>
+      <div class="form-group">
+        <label class="form-lbl">Cooking Method</label>
+        <select class="form-select" id="f-method">
+          <option value="stovetop">Stovetop</option>
+          <option value="oven">Oven</option>
+          <option value="crockpot">Crockpot</option>
+        </select>
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label class="form-lbl">Prep Time (min)</label>
+          <input class="form-input" id="f-prep" type="number" placeholder="15">
+        </div>
+        <div class="form-group">
+          <label class="form-lbl">Cook Time (min)</label>
+          <input class="form-input" id="f-cook" type="number" placeholder="30">
+        </div>
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label class="form-lbl">Calories / serving</label>
+          <input class="form-input" id="f-cal" type="number" placeholder="650">
+        </div>
+        <div class="form-group">
+          <label class="form-lbl">Protein (g) / serving</label>
+          <input class="form-input" id="f-prot" type="number" placeholder="65">
+        </div>
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label class="form-lbl">Carbs (g)</label>
+          <input class="form-input" id="f-carbs" type="number" placeholder="40">
+        </div>
+        <div class="form-group">
+          <label class="form-lbl">Fat (g)</label>
+          <input class="form-input" id="f-fat" type="number" placeholder="20">
+        </div>
+      </div>
+      <div class="form-group">
+        <label class="form-lbl">Ingredients (one per line)</label>
+        <textarea class="form-textarea" id="f-ings" placeholder="2.5 lbs chicken thighs&#10;3 cloves garlic"></textarea>
+      </div>
+      <div class="form-group">
+        <label class="form-lbl">Steps (one per line)</label>
+        <textarea class="form-textarea" id="f-steps" placeholder="Season chicken...&#10;Heat pan..."></textarea>
+      </div>
+      <div class="form-group">
+        <label class="form-lbl">Blood Sugar Note (optional)</label>
+        <textarea class="form-textarea" id="f-bs" placeholder="High protein content..." style="min-height:60px"></textarea>
+      </div>
+      <button class="save-btn" onclick="saveCustomRecipe()">Add to Rotation</button>`;
+  }
+}
+function renderMiniCal(monthDate,earliest,picked){
+  const yr=monthDate.getFullYear(),mo=monthDate.getMonth();
+  const first=new Date(yr,mo,1),last=new Date(yr,mo+1,0);
+  const startDow=(first.getDay()+6)%7; // 0=Mon
+  const DOWS=['Mo','Tu','We','Th','Fr','Sa','Su'];
+  let html=DOWS.map(d=>`<div class="mini-dow">${d}</div>`).join('');
+  for(let i=0;i<startDow;i++)html+=`<div class="mini-day empty"></div>`;
+  for(let d=1;d<=last.getDate();d++){
+    const dt=new Date(yr,mo,d);
+    const disabled=d0(dt)<d0(earliest);
+    const sel=picked&&sameDay(dt,picked);
+    html+=`<div class="mini-day${disabled?' disabled':''}${sel?' selected':''}" ${disabled?'':` onclick="pickDate(${yr},${mo},${d})"`}>${d}</div>`;
+  }
+  return html;
+}
+function addCalNav(dir){
+  addCalMonth=new Date(addCalMonth);addCalMonth.setMonth(addCalMonth.getMonth()+dir);
+  renderAddModal();
+}
+function pickDate(y,m,d){
+  const dt=new Date(y,m,d);
+  addPickedDate=dt;
+  renderAddModal();
+}
+function addStep2(){
+  if(!addPickedDate)return;
+  addStep=2;renderAddModal();
+}
+function saveCustomRecipe(){
+  const name=document.getElementById('f-name').value.trim();
+  if(!name){alert('Please enter a recipe name.');return}
+  const id=`custom-${Date.now()}`;
+  const recipe={
+    name,
+    method:document.getElementById('f-method').value,
+    prepTime:parseInt(document.getElementById('f-prep').value)||15,
+    cookTime:parseInt(document.getElementById('f-cook').value)||30,
+    servings:4,
+    ingredients:document.getElementById('f-ings').value.trim().split('\n').filter(Boolean),
+    steps:document.getElementById('f-steps').value.trim().split('\n').filter(Boolean),
+    macros:{
+      calories:parseInt(document.getElementById('f-cal').value)||0,
+      protein:parseInt(document.getElementById('f-prot').value)||0,
+      carbs:parseInt(document.getElementById('f-carbs').value)||0,
+      fat:parseInt(document.getElementById('f-fat').value)||0
+    },
+    estimatedCost:0,
+    bloodSugarNote:document.getElementById('f-bs').value.trim()
+  };
+  // Save custom meal
+  const custom=lsGet(LS.custom,{});custom[id]=recipe;lsSet(LS.custom,custom);
+  // Add to rotation
+  const rot=getRotation();rot.push(id);lsSet(LS.rot,rot);
+  // Add insertion
+  const ins=lsGet(LS.ins,[]);ins.push({id,firstDate:fmtKey(addPickedDate)});lsSet(LS.ins,ins);
+  closeModal('modal-add');
+  renderMeals();renderCalendar();
+}
+
+// ── MODALS ─────────────────────────────────────────────────
+function openModal(id){document.getElementById(id).classList.remove('hidden')}
+function closeModal(id){document.getElementById(id).classList.add('hidden')}
+
+// ── TABS ───────────────────────────────────────────────────
+function showSection(secId){
+  document.querySelectorAll('.section').forEach(s=>s.classList.remove('active'));
+  document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));
+  document.getElementById(secId).classList.add('active');
+  document.querySelector(`.tab[data-sec="${secId}"]`).classList.add('active');
+  if(secId==='sec-shopping'){initShoppingPeriods();renderShopTabs();renderShopToggle();renderShopItems()}
+  if(secId==='sec-calendar')renderCalendar();
+  if(secId==='sec-meals')renderMeals();
+}
+
+// ── INIT ───────────────────────────────────────────────────
+async function init(){
+  initSupabase();
+  await syncFromSupabase();
+  initStorage();
+  initCalStart();
+  renderCalendar();
+  renderMeals();
+  initShoppingPeriods();
+  renderShopTabs();
+  renderShopToggle();
+  renderShopItems();
+  subscribeRealtime();
+}
+document.addEventListener('DOMContentLoaded',init);
+</script>
+</body>
+</html>
