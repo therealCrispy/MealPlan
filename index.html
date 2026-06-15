@@ -1126,30 +1126,26 @@ function closeModal(id){
 }
 function setupSwipeToDismiss(modal){
   const sheet=modal.querySelector('.modal-sheet');
-  if(!sheet||sheet._swipeSetup)return;
+  const pill=modal.querySelector('.modal-pill');
+  if(!sheet||!pill||sheet._swipeSetup)return;
   sheet._swipeSetup=true;
-  let startY=0,startScroll=0,dragging=false;
-  sheet.addEventListener('touchstart',e=>{
-    if(sheet.scrollTop>0)return;
+  let startY=0,dragging=false;
+  pill.addEventListener('touchstart',e=>{
     startY=e.touches[0].clientY;
-    startScroll=sheet.scrollTop;
     dragging=true;
+    sheet.style.transition='none';
   },{passive:true});
-  sheet.addEventListener('touchmove',e=>{
+  pill.addEventListener('touchmove',e=>{
     if(!dragging)return;
-    const dy=e.touches[0].clientY-startY;
-    if(dy>0&&sheet.scrollTop<=0){
-      e.preventDefault();
-      sheet.style.transform=`translateY(${dy}px)`;
-      sheet.style.transition='none';
-    }
-  },{passive:false});
-  sheet.addEventListener('touchend',e=>{
+    const dy=Math.max(0,e.touches[0].clientY-startY);
+    sheet.style.transform=`translateY(${dy}px)`;
+  },{passive:true});
+  pill.addEventListener('touchend',e=>{
     if(!dragging)return;
     dragging=false;
-    const dy=e.changedTouches[0].clientY-startY;
     sheet.style.transition='';
-    if(dy>100){
+    const dy=e.changedTouches[0].clientY-startY;
+    if(dy>80){
       sheet.style.transform='';
       closeModal(modal.id);
     } else {
