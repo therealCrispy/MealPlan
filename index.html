@@ -324,7 +324,7 @@ html,body{height:100%;background:var(--bg);color:var(--t1);
     <span>Shopping</span>
   </button>
 </nav>
-<div id="version-badge">v2.3</div>
+<div id="version-badge">v2.4</div>
 
 <div id="modal-recipe" class="modal hidden">
   <div class="modal-bd" onclick="closeModal('modal-recipe')"></div>
@@ -714,24 +714,25 @@ function setupCalSwipe(){
       const exitY=_calDragDir>0?-h:h;
       cards.style.transition=sp;cards.style.transform=`translateY(${exitY}px)`;
       _calClone.style.transition=sp;_calClone.style.transform='translateY(0)';
-      const dir=_calDragDir,clone=_calClone;
+      const dir=_calDragDir,clone=_calClone,wrap=cards.parentElement;
       setTimeout(()=>{
-        calStart=new Date(calStart);calStart.setDate(calStart.getDate()+dir*7);
         clone.remove();_calClone=null;
+        // Clear ALL inline styles before re-render so CSS takes back over
+        cards.style.cssText='';
+        wrap.style.cssText='';
+        calStart=new Date(calStart);calStart.setDate(calStart.getDate()+dir*7);
         renderCalendar();
-        // restore cards layout
-        const c=document.getElementById('cal-cards');
-        c.style.position='';c.style.inset='';
         _calDragDir=0;_calSwiping=false;
       },360);
     } else {
       // Snap back
       cards.style.transition=sp;cards.style.transform='translateY(0)';
-      const h2=cards.offsetHeight,dir=_calDragDir,clone=_calClone;
+      const h2=cards.offsetHeight,dir=_calDragDir,clone=_calClone,wrap=cards.parentElement;
       clone.style.transition=sp;clone.style.transform=`translateY(${dir>0?h2:-h2}px)`;
       setTimeout(()=>{
         clone.remove();if(_calClone===clone)_calClone=null;
-        cards.style.position='';cards.style.inset='';
+        cards.style.cssText='';
+        wrap.style.cssText='';
         _calDragDir=0;_calSwiping=false;
       },360);
     }
