@@ -54,6 +54,7 @@ html,body{height:100%;background:var(--bg);color:var(--t1);
 .section{display:none;flex:1;overflow-y:auto;
   padding:calc(env(safe-area-inset-top,44px) + 16px) 16px calc(var(--tab) + env(safe-area-inset-bottom,0px) + 20px);
   -webkit-overflow-scrolling:touch;gap:10px;flex-direction:column}
+#sec-calendar{overflow:hidden;display:flex;flex-direction:column}
 .section.active{display:flex;animation:sectionIn 0.28s var(--ease-out) both}
 @keyframes sectionIn{from{opacity:0;transform:translateY(5px)}to{opacity:1;transform:translateY(0)}}
 
@@ -93,7 +94,8 @@ html,body{height:100%;background:var(--bg);color:var(--t1);
 .icon-btn:active{transform:scale(0.88);background:var(--s3)}
 
 /* Day cards */
-.day-card{background:var(--s1);border-radius:16px;padding:13px 14px;
+#cal-cards{display:flex;flex-direction:column;gap:8px;flex:1}
+.day-card{background:var(--s1);border-radius:16px;padding:13px 14px;flex:1;
   display:flex;align-items:center;gap:11px;cursor:pointer;position:relative;
   border:1.5px solid transparent;
   transition:transform 0.15s var(--ease-out),opacity 0.15s}
@@ -120,6 +122,7 @@ html,body{height:100%;background:var(--bg);color:var(--t1);
 .badge-rice{background:rgba(255,159,10,.2);color:var(--orange)}
 
 /* Meals list */
+#meals-list{display:flex;flex-direction:column;gap:8px}
 .meal-item{background:var(--s1);border-radius:14px;padding:11px 13px;
   display:flex;align-items:center;gap:9px;
   transition:transform 0.15s var(--ease-out),opacity 0.2s,box-shadow 0.2s}
@@ -321,7 +324,7 @@ html,body{height:100%;background:var(--bg);color:var(--t1);
     <span>Shopping</span>
   </button>
 </nav>
-<div id="version-badge">v1.8</div>
+<div id="version-badge">v1.9</div>
 
 <div id="modal-recipe" class="modal hidden">
   <div class="modal-bd" onclick="closeModal('modal-recipe')"></div>
@@ -649,6 +652,21 @@ function generateShoppingList(startDate,numDays,storeType){
 let calStart=null; // first day of 7-card window
 function initCalStart(){
   calStart=d0(new Date()); // today is card 1
+  setupCalSwipe();
+}
+function setupCalSwipe(){
+  const sec=document.getElementById('sec-calendar');
+  let sy=0,dragging=false;
+  sec.addEventListener('touchstart',e=>{
+    // don't steal taps on buttons/cards
+    if(e.target.closest('button')||e.target.closest('.day-card'))return;
+    sy=e.touches[0].clientY;dragging=true;
+  },{passive:true});
+  sec.addEventListener('touchend',e=>{
+    if(!dragging)return;dragging=false;
+    const dy=e.changedTouches[0].clientY-sy;
+    if(Math.abs(dy)>50)calNav(dy<0?1:-1);
+  },{passive:true});
 }
 function calNav(dir){
   calStart=new Date(calStart);calStart.setDate(calStart.getDate()+dir*7);
