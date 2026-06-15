@@ -184,6 +184,20 @@ html,body{height:100%;background:var(--bg);color:var(--t1);
 .shop-item-text{flex:1;font-size:15px;line-height:1.3;transition:color 0.2s,opacity 0.2s}
 .shop-item.checked .shop-item-text{color:var(--t3);text-decoration:line-through;opacity:.6}
 .shop-meal-ct{font-size:11px;color:var(--t3);flex-shrink:0}
+.shop-item.covered{opacity:.45}
+.shop-item.covered .shop-item-text{text-decoration:line-through}
+.pantry-btn{background:none;border:1.5px solid var(--s3);color:var(--t3);
+  font-size:11px;font-weight:600;font-family:inherit;padding:3px 7px;border-radius:8px;
+  cursor:pointer;white-space:nowrap;flex-shrink:0;transition:all 0.15s}
+.pantry-btn.has-qty{border-color:var(--green);color:var(--green);background:var(--green-tint)}
+.pantry-covered-row{padding:12px 0;font-size:13px;color:var(--t3);cursor:pointer;
+  display:flex;align-items:center;gap:6px;border-top:0.5px solid var(--divider);margin-top:4px}
+.pantry-input-row{display:flex;align-items:center;gap:8px;padding:8px 0;
+  animation:sectionIn 0.18s var(--ease-out) both}
+.pantry-qty-input{background:var(--s2);border:1.5px solid var(--accent);border-radius:10px;
+  color:var(--t1);font-size:15px;font-family:inherit;padding:7px 10px;width:80px;
+  text-align:center;outline:none}
+.pantry-unit-lbl{font-size:13px;color:var(--t2);flex:1}
 #reset-shop-btn{width:100%;background:none;border:0.5px solid var(--s3);
   color:var(--t3);font-size:15px;font-family:inherit;
   padding:14px;border-radius:14px;cursor:pointer;margin-top:16px;
@@ -324,7 +338,7 @@ html,body{height:100%;background:var(--bg);color:var(--t1);
     <span>Shopping</span>
   </button>
 </nav>
-<div id="version-badge">v2.8</div>
+<div id="version-badge">v2.9</div>
 
 <div id="modal-recipe" class="modal hidden">
   <div class="modal-bd" onclick="closeModal('modal-recipe')"></div>
@@ -455,7 +469,7 @@ function rerenderAll(){
 const LS = {
   rot:'mealplan_rotation', muted:'mealplan_muted',
   custom:'mealplan_custom_meals', ins:'mealplan_insertions',
-  shop:'mealplan_shop_checked'
+  shop:'mealplan_shop_checked', pantry:'mealplan_pantry'
 };
 function lsGet(k,d){try{const v=localStorage.getItem(k);return v?JSON.parse(v):d}catch{return d}}
 function lsSet(k,v){try{localStorage.setItem(k,JSON.stringify(v))}catch{}supaSet(k,v);}
@@ -953,29 +967,114 @@ function getShopKey(){
   const s=shopPeriods[shopPeriodIdx];
   return`${fmtKey(s)}_${shopStore}`;
 }
+function getPantry(){return lsGet(LS.pantry,{});}
+function setPantry(p){lsSet(LS.pantry,p);}
+function parseDisplayQty(display){
+  const m=display.match(/^([\d.]+)\s*([a-z]+)?\s/i);
+  if(!m)return{qty:null,unit:''};
+  return{qty:parseFloat(m[1]),unit:(m[2]||'').toLowerCase()};
+}
 function renderShopItems(){
   const period=shopPeriods[shopPeriodIdx];
-  // Start date = Monday after the bulk Sunday
   const start=new Date(period);start.setDate(start.getDate()+1);
   const numDays=shopStore==='sams'?14:7;
   const groups=generateShoppingList(start,numDays,shopStore);
   const checked=lsGet(LS.shop,{});
   const key=getShopKey();
   const checkedForPeriod=checked[key]||{};
+  const pantry=getPantry();
   const container=document.getElementById('shop-items');
   if(!groups.length){container.innerHTML='<p style="color:var(--t3);padding:20px 0;text-align:center">No meals scheduled for this period.</p>';return}
-  container.innerHTML=groups.map(g=>`
-    <div class="shop-category">
-      <div class="shop-cat-title">${g.cat}</div>
-      ${g.items.map(item=>{
-        const isChk=!!checkedForPeriod[item.key];
-        return`<div class="shop-item${isChk?' checked':''}" data-key="${item.key.replace(/"/g,'&quot;')}" onclick="toggleShopItem('${item.key.replace(/'/g,"\\'")}')">
-          <div class="shop-chk"></div>
+  container.innerHTML='';
+  groups.forEach(g=>{
+    const catEl=document.createElement('div');
+    catEl.className='shop-category';
+    catEl.innerHTML=`<div class="shop-cat-title">${g.cat}</div>`;
+    const covered=[];
+    g.items.forEach(item=>{
+      const isChk=!!checkedForPeriod[item.key];
+      const pantryQty=pantry[item.key];
+      const hasPantry=pantryQty!=null;
+      const {qty:neededQty,unit}=parseDisplayQty(item.display);
+      let adjDisplay=item.display;
+      let isCovered=false;
+      if(hasPantry&&neededQty!=null){
+        const haveQty=parseFloat(pantryQty)||0;
+        const buyQty=Math.round(Math.max(0,neededQty-haveQty)*10)/10;
+        if(buyQty<=0){isCovered=true;}
+        else adjDisplay=item.display.replace(/^[\d.]+(\s*[a-z]+)?\s/i,`${buyQty}${unit?' '+unit:''} `);
+      }
+      if(isCovered){covered.push({item,pantryQty,unit});return;}
+      const esc=k=>k.replace(/'/g,"\\'");
+      const row=document.createElement('div');
+      row.className=`shop-item${isChk?' checked':''}`;
+      row.dataset.key=item.key;
+      row.innerHTML=`
+        <div class="shop-chk" onclick="event.stopPropagation();toggleShopItem('${esc(item.key)}')"></div>
+        <span class="shop-item-text">${adjDisplay}${hasPantry?` <span style="font-size:11px;color:var(--green);opacity:.8">(have ${pantryQty}${unit?' '+unit:''})</span>`:''}</span>
+        ${item.mealCt>1?`<span class="shop-meal-ct">×${item.mealCt}</span>`:''}
+        <button class="pantry-btn${hasPantry?' has-qty':''}" onclick="event.stopPropagation();openPantryInput('${esc(item.key)}','${esc(item.display)}','${unit}')">${hasPantry?`${pantryQty}${unit?' '+unit:''}`:'have?'}</button>`;
+      catEl.appendChild(row);
+    });
+    if(covered.length){
+      const summary=document.createElement('div');
+      summary.className='pantry-covered-row';
+      let expanded=false;
+      const coveredEls=[];
+      covered.forEach(({item,pantryQty,unit})=>{
+        const esc=k=>k.replace(/'/g,"\\'");
+        const el=document.createElement('div');
+        el.className='shop-item covered';
+        el.style.display='none';
+        el.dataset.key=item.key;
+        el.innerHTML=`
+          <div class="shop-chk" style="border-color:var(--green);background:var(--green-tint)"></div>
           <span class="shop-item-text">${item.display}</span>
-          ${item.mealCt>1?`<span class="shop-meal-ct">×${item.mealCt}</span>`:''}
-        </div>`;
-      }).join('')}
-    </div>`).join('');
+          <button class="pantry-btn has-qty" onclick="event.stopPropagation();openPantryInput('${esc(item.key)}','${esc(item.display)}','${unit}')">${pantryQty}${unit?' '+unit:''}</button>`;
+        catEl.appendChild(el);
+        coveredEls.push(el);
+      });
+      const setLabel=()=>{summary.innerHTML=`<span>${expanded?'−':'✓'}</span> ${covered.length} item${covered.length>1?'s':''} covered by pantry — tap to ${expanded?'hide':'view'}`;};
+      setLabel();
+      summary.onclick=()=>{expanded=!expanded;coveredEls.forEach(el=>el.style.display=expanded?'flex':'none');setLabel();};
+      catEl.appendChild(summary);
+    }
+    container.appendChild(catEl);
+  });
+}
+function openPantryInput(key,display,unit){
+  const existing=document.getElementById('pantry-input-row');
+  if(existing)existing.remove();
+  const pantry=getPantry();
+  const current=pantry[key]??'';
+  const label=display.replace(/^[\d.]+(\s*[a-z]+)?\s/i,'').trim();
+  const anchor=document.querySelector(`.shop-item[data-key="${key.replace(/"/g,'&quot;')}"]`);
+  if(!anchor)return;
+  const inputRow=document.createElement('div');
+  inputRow.className='pantry-input-row';
+  inputRow.id='pantry-input-row';
+  inputRow.innerHTML=`
+    <span class="pantry-unit-lbl">How much <b>${label}</b>?</span>
+    <input class="pantry-qty-input" id="pantry-qty-field" type="number" min="0" step="0.25" placeholder="0" value="${current}">
+    <span style="font-size:13px;color:var(--t2)">${unit||''}</span>
+    <button class="pantry-btn has-qty" onclick="savePantryQty('${key.replace(/'/g,"\\'")}')">Save</button>
+    <button class="pantry-btn" onclick="clearPantryQty('${key.replace(/'/g,"\\'")}')">Clear</button>`;
+  anchor.parentElement.insertBefore(inputRow,anchor.nextSibling);
+  document.getElementById('pantry-qty-field').focus();
+}
+function savePantryQty(key){
+  const input=document.getElementById('pantry-qty-field');
+  if(!input)return;
+  const val=parseFloat(input.value);
+  const pantry=getPantry();
+  if(!isNaN(val)&&val>=0)pantry[key]=val;
+  else delete pantry[key];
+  setPantry(pantry);
+  renderShopItems();
+}
+function clearPantryQty(key){
+  const pantry=getPantry();delete pantry[key];
+  setPantry(pantry);renderShopItems();
 }
 function toggleShopItem(key){
   const checked=lsGet(LS.shop,{});
