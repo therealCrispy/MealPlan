@@ -324,7 +324,7 @@ html,body{height:100%;background:var(--bg);color:var(--t1);
     <span>Shopping</span>
   </button>
 </nav>
-<div id="version-badge">v2.6</div>
+<div id="version-badge">v2.7</div>
 
 <div id="modal-recipe" class="modal hidden">
   <div class="modal-bd" onclick="closeModal('modal-recipe')"></div>
@@ -658,6 +658,7 @@ let _calSwiping=false; // true if finger moved enough to be a swipe, not a tap
 let _calClone=null,_calDragDir=0;
 function setupCalSwipe(){
   const sec=document.getElementById('sec-calendar');
+  const GAP=20;
   let sx=0,sy=0,active=false,dirLocked=false,clipWrap=null;
   sec.addEventListener('touchstart',e=>{
     if(e.target.closest('button'))return;
@@ -686,14 +687,14 @@ function setupCalSwipe(){
       cards.style.cssText='flex:1;display:flex;flex-direction:column;gap:8px;transition:none;';
       // Build adjacent week clone inside same wrapper
       _calClone=document.createElement('div');
-      _calClone.style.cssText=`position:absolute;inset:0;display:flex;flex-direction:column;gap:8px;transform:translateY(${_calDragDir>0?h:-h}px);`;
+      _calClone.style.cssText=`position:absolute;inset:0;display:flex;flex-direction:column;gap:8px;transform:translateY(${_calDragDir>0?h+GAP:-(h+GAP)}px);`;
       buildCalWeek(_calClone,_calDragDir);
       clipWrap.appendChild(_calClone);
     }
     const cards=document.getElementById('cal-cards');
     const h=cards.offsetHeight||clipWrap.offsetHeight;
     cards.style.transform=`translateY(${dy}px)`;
-    _calClone.style.transform=`translateY(${dy+(_calDragDir>0?h:-h)}px)`;
+    _calClone.style.transform=`translateY(${dy+(_calDragDir>0?h+GAP:-(h+GAP))}px)`;
   },{passive:true});
   const finish=e=>{
     if(!active)return;active=false;
@@ -720,13 +721,13 @@ function setupCalSwipe(){
       }),390);
     };
     if(commit){
-      const exitY=_calDragDir>0?-h:h;
+      const exitY=_calDragDir>0?-(h+GAP):h+GAP;
       cards.style.transition=sp;cards.style.transform=`translateY(${exitY}px)`;
       _calClone.style.transition=sp;_calClone.style.transform='translateY(0)';
       teardown(true);
     } else {
       cards.style.transition=sp;cards.style.transform='translateY(0)';
-      _calClone.style.transition=sp;_calClone.style.transform=`translateY(${_calDragDir>0?h:-h}px)`;
+      _calClone.style.transition=sp;_calClone.style.transform=`translateY(${_calDragDir>0?h+GAP:-(h+GAP)}px)`;
       teardown(false);
     }
   };
