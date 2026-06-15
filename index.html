@@ -124,14 +124,15 @@ html,body{height:100%;background:var(--bg);color:var(--t1);
 .modal{position:fixed;inset:0;z-index:200;display:flex;align-items:flex-end}
 .modal.hidden{display:none}
 .modal-bd{position:absolute;inset:0;background:rgba(0,0,0,.55)}
-.modal-sheet{position:relative;width:100%;max-height:92vh;
+.modal-sheet{position:relative;width:100%;max-height:88vh;
   background:var(--s1);border-radius:20px 20px 0 0;
   overflow-y:auto;-webkit-overflow-scrolling:touch;
-  padding:8px 20px calc(env(safe-area-inset-bottom,0px) + 28px)}
+  padding:8px 20px calc(env(safe-area-inset-bottom,0px) + 28px);
+  padding-bottom:max(28px,calc(env(safe-area-inset-bottom,0px) + 28px))}
 .modal-pill{width:36px;height:4px;background:var(--s3);border-radius:2px;margin:0 auto 14px}
-.modal-close{position:absolute;top:16px;right:16px;background:var(--s2);
-  border:none;color:var(--t2);width:30px;height:30px;border-radius:50%;
-  font-size:15px;display:flex;align-items:center;justify-content:center;cursor:pointer}
+.modal-close{position:absolute;top:20px;right:16px;background:var(--s3);
+  border:none;color:var(--t1);width:34px;height:34px;border-radius:50%;
+  font-size:16px;display:flex;align-items:center;justify-content:center;cursor:pointer;z-index:10}
 /* Recipe modal content */
 .rm-title{font-size:22px;font-weight:700;margin-bottom:8px;padding-right:40px}
 .rm-meta{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:14px}
@@ -653,17 +654,26 @@ function deleteMeal(id){
 }
 
 // ── DRAG & DROP ────────────────────────────────────────────
+let dragSetupDone=false;
 function setupDragDrop(){
+  if(dragSetupDone)return;
+  dragSetupDone=true;
   const list=document.getElementById('meals-list');
-  let dragging=null;
-  list.addEventListener('touchstart',e=>{
-    if(!e.target.classList.contains('drag-handle'))return;
-    e.preventDefault();
-    dragging=e.target.closest('.meal-item');
+  let dragging=null,longPressTimer=null;
+  const startDrag=(el)=>{
+    dragging=el;
     dragging.classList.add('dragging');
+  };
+  list.addEventListener('touchstart',e=>{
+    const handle=e.target.closest('.drag-handle');
+    if(!handle)return;
+    e.preventDefault();
+    const item=handle.closest('.meal-item');
+    longPressTimer=setTimeout(()=>startDrag(item),0);
   },{passive:false});
   list.addEventListener('touchmove',e=>{
-    if(!dragging)return;e.preventDefault();
+    if(!dragging)return;
+    e.preventDefault();
     const y=e.touches[0].clientY;
     const items=[...list.querySelectorAll('.meal-item:not(.dragging)')];
     let inserted=false;
@@ -674,6 +684,7 @@ function setupDragDrop(){
     if(!inserted&&items.length)list.appendChild(dragging);
   },{passive:false});
   const done=()=>{
+    clearTimeout(longPressTimer);
     if(!dragging)return;
     dragging.classList.remove('dragging');dragging=null;
     const ids=[...list.querySelectorAll('.meal-item')].map(el=>el.dataset.id);
@@ -816,7 +827,8 @@ function renderAddModal(){
         </div>
         <div class="mini-grid">${renderMiniCal(addCalMonth,earliest,addPickedDate)}</div>
       </div>
-      <button class="save-btn" id="next-btn" onclick="addStep2()" ${addPickedDate?'':'disabled'}>Next</button>`;
+      <button class="save-btn" id="next-btn" onclick="addStep2()" ${addPickedDate?'':'disabled'} style="margin-bottom:10px">Next</button>
+      <button class="save-btn" onclick="addStep2Skip()" style="background:var(--s3);color:var(--t2)">Skip — Add to End of Rotation</button>`;
   } else {
     body.innerHTML=`
       <h2 class="rm-title">Recipe Details</h2>
@@ -906,6 +918,10 @@ function addStep2(){
   if(!addPickedDate)return;
   addStep=2;renderAddModal();
 }
+function addStep2Skip(){
+  addPickedDate=null;
+  addStep=2;renderAddModal();
+}
 function saveCustomRecipe(){
   const name=document.getElementById('f-name').value.trim();
   if(!name){alert('Please enter a recipe name.');return}
@@ -937,6 +953,7 @@ function saveCustomRecipe(){
   renderMeals();renderCalendar();
 }
 
+let pendingImport=null;
 function importRecipeJSON(input){
   const file=input.files[0];
   if(!file)return;
@@ -944,35 +961,77 @@ function importRecipeJSON(input){
   reader.onload=e=>{
     try{
       const data=JSON.parse(e.target.result);
-      const recipes=Array.isArray(data)?data:[data];
-      let added=0;
-      recipes.forEach(r=>{
-        if(!r.name||!r.ingredients||!r.steps){return;}
-        const id=r.id||`custom-${Date.now()}-${Math.random().toString(36).slice(2,6)}`;
-        const recipe={
-          name:r.name,
-          method:r.method||'stovetop',
-          prepTime:r.prepTime||15,
-          cookTime:r.cookTime||30,
-          servings:r.servings||4,
-          ingredients:r.ingredients,
-          steps:r.steps,
-          macros:r.macros||{calories:0,protein:0,carbs:0,fat:0},
-          estimatedCost:r.estimatedCost||0,
-          bloodSugarNote:r.bloodSugarNote||''
-        };
-        const custom=lsGet(LS.custom,{});custom[id]=recipe;lsSet(LS.custom,custom);
-        const rot=getRotation();rot.push(id);lsSet(LS.rot,rot);
-        added++;
-      });
+      const recipes=(Array.isArray(data)?data:[data]).filter(r=>r.name&&r.ingredients&&r.steps);
+      if(!recipes.length){alert('No valid recipes found in JSON.');return;}
+      pendingImport=recipes;
       input.value='';
-      renderMeals();renderCalendar();
-      alert(`${added} recipe${added!==1?'s':''} imported successfully!`);
-    }catch(err){
-      alert('Invalid JSON file. Make sure it matches the recipe format.');
-    }
+      addStep=1;addPickedDate=null;
+      addCalMonth=new Date();addCalMonth.setDate(1);
+      renderImportModal();
+      openModal('modal-add');
+    }catch{alert('Invalid JSON file.');}
   };
   reader.readAsText(file);
+}
+function renderImportModal(){
+  const body=document.getElementById('modal-add-body');
+  const earliest=getEarliestAddDate();
+  const names=pendingImport.map(r=>r.name).join(', ');
+  body.innerHTML=`
+    <h2 class="rm-title">Import Recipe</h2>
+    <p class="step-hint" style="margin-bottom:10px;color:var(--t2)">${names}</p>
+    <p class="step-hint">Pick a start date or skip to add to end of rotation</p>
+    <div class="mini-cal">
+      <div class="mini-cal-hdr">
+        <button class="mini-nav" onclick="importCalNav(-1)">&#8249;</button>
+        <span class="mini-cal-title">${fmtMon(addCalMonth)}</span>
+        <button class="mini-nav" onclick="importCalNav(1)">&#8250;</button>
+      </div>
+      <div class="mini-grid">${renderMiniCalImport(addCalMonth,earliest,addPickedDate)}</div>
+    </div>
+    <button class="save-btn" onclick="confirmImport()" ${addPickedDate?'':'disabled'} style="margin-bottom:10px;margin-top:14px">Import for ${addPickedDate?fmtShort(addPickedDate):'...'}</button>
+    <button class="save-btn" onclick="confirmImport(true)" style="background:var(--s3);color:var(--t2)">Skip — Add to End of Rotation</button>`;
+}
+function renderMiniCalImport(monthDate,earliest,picked){
+  const yr=monthDate.getFullYear(),mo=monthDate.getMonth();
+  const first=new Date(yr,mo,1),last=new Date(yr,mo+1,0);
+  const startDow=(first.getDay()+6)%7;
+  const DOWS=['Mo','Tu','We','Th','Fr','Sa','Su'];
+  let html=DOWS.map(d=>`<div class="mini-dow">${d}</div>`).join('');
+  for(let i=0;i<startDow;i++)html+=`<div class="mini-day empty"></div>`;
+  for(let d=1;d<=last.getDate();d++){
+    const dt=new Date(yr,mo,d);
+    const disabled=d0(dt)<d0(earliest);
+    const sel=picked&&sameDay(dt,picked);
+    html+=`<div class="mini-day${disabled?' disabled':''}${sel?' selected':''}" ${disabled?'':` onclick="pickDateImport(${yr},${mo},${d})"`}>${d}</div>`;
+  }
+  return html;
+}
+function pickDateImport(y,m,d){addPickedDate=new Date(y,m,d);renderImportModal();}
+function importCalNav(dir){addCalMonth=new Date(addCalMonth);addCalMonth.setMonth(addCalMonth.getMonth()+dir);renderImportModal();}
+function confirmImport(skip=false){
+  if(!pendingImport)return;
+  let added=0;
+  pendingImport.forEach(r=>{
+    const id=r.id||`custom-${Date.now()}-${Math.random().toString(36).slice(2,6)}`;
+    const recipe={
+      name:r.name,method:r.method||'stovetop',
+      prepTime:r.prepTime||15,cookTime:r.cookTime||30,servings:r.servings||4,
+      ingredients:r.ingredients,steps:r.steps,
+      macros:r.macros||{calories:0,protein:0,carbs:0,fat:0},
+      estimatedCost:r.estimatedCost||0,bloodSugarNote:r.bloodSugarNote||''
+    };
+    const custom=lsGet(LS.custom,{});custom[id]=recipe;lsSet(LS.custom,custom);
+    const rot=getRotation();rot.push(id);lsSet(LS.rot,rot);
+    if(!skip&&addPickedDate){
+      const ins=lsGet(LS.ins,[]);ins.push({id,firstDate:fmtKey(addPickedDate)});lsSet(LS.ins,ins);
+    }
+    added++;
+  });
+  pendingImport=null;
+  closeModal('modal-add');
+  renderMeals();renderCalendar();
+  alert(`${added} recipe${added!==1?'s':''} imported!`);
 }
 
 // ── MODALS ─────────────────────────────────────────────────
