@@ -1130,17 +1130,22 @@ function setupSwipeToDismiss(modal){
   if(!sheet||!pill||sheet._swipeSetup)return;
   sheet._swipeSetup=true;
   let startY=0,dragging=false;
+  pill.style.padding='16px 40px';
+  pill.style.margin='-16px auto 0';
   pill.addEventListener('touchstart',e=>{
+    e.preventDefault();
     startY=e.touches[0].clientY;
     dragging=true;
     sheet.style.transition='none';
-  },{passive:true});
+  },{passive:false});
   pill.addEventListener('touchmove',e=>{
+    e.preventDefault();
     if(!dragging)return;
     const dy=Math.max(0,e.touches[0].clientY-startY);
     sheet.style.transform=`translateY(${dy}px)`;
-  },{passive:true});
+  },{passive:false});
   pill.addEventListener('touchend',e=>{
+    e.preventDefault();
     if(!dragging)return;
     dragging=false;
     sheet.style.transition='';
@@ -1151,7 +1156,7 @@ function setupSwipeToDismiss(modal){
     } else {
       sheet.style.transform='';
     }
-  });
+  },{passive:false});
 }
 
 // ── TABS ───────────────────────────────────────────────────
