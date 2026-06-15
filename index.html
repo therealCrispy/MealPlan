@@ -1126,37 +1126,59 @@ function closeModal(id){
 }
 function setupSwipeToDismiss(modal){
   const sheet=modal.querySelector('.modal-sheet');
-  const pill=modal.querySelector('.modal-pill');
-  if(!sheet||!pill||sheet._swipeSetup)return;
+  if(!sheet||sheet._swipeSetup)return;
   sheet._swipeSetup=true;
-  let startY=0,dragging=false;
-  pill.style.padding='16px 40px';
-  pill.style.margin='-16px auto 0';
-  pill.addEventListener('touchstart',e=>{
+
+  // Replace pill with a large tap-target drag zone
+  const oldPill=modal.querySelector('.modal-pill');
+  if(oldPill)oldPill.remove();
+  const dragZone=document.createElement('div');
+  dragZone.style.cssText='position:sticky;top:0;height:48px;margin:-8px -20px 8px;display:flex;align-items:center;justify-content:center;cursor:grab;z-index:2;flex-shrink:0';
+  dragZone.innerHTML='<div style="width:36px;height:4px;background:var(--s3);border-radius:2px;pointer-events:none"></div>';
+  sheet.insertBefore(dragZone,sheet.firstChild);
+
+  let startY=0,lastY=0,lastT=0,vel=0,dragging=false;
+
+  dragZone.addEventListener('touchstart',e=>{
     e.preventDefault();
-    startY=e.touches[0].clientY;
-    dragging=true;
+    startY=lastY=e.touches[0].clientY;
+    lastT=Date.now();vel=0;dragging=true;
     sheet.style.transition='none';
   },{passive:false});
-  pill.addEventListener('touchmove',e=>{
-    e.preventDefault();
+
+  // Listen on document so gesture survives finger drift
+  document.addEventListener('touchmove',e=>{
     if(!dragging)return;
-    const dy=Math.max(0,e.touches[0].clientY-startY);
-    sheet.style.transform=`translateY(${dy}px)`;
-  },{passive:false});
-  pill.addEventListener('touchend',e=>{
     e.preventDefault();
+    const now=Date.now(),y=e.touches[0].clientY;
+    const dt=now-lastT;
+    if(dt>0)vel=(y-lastY)/dt;
+    lastY=y;lastT=now;
+    const dy=Math.max(0,y-startY);
+    sheet.style.transform=`translateY(${dy}px)`;
+  },{passive:false,capture:true});
+
+  const finish=e=>{
     if(!dragging)return;
     dragging=false;
-    sheet.style.transition='';
-    const dy=e.changedTouches[0].clientY-startY;
-    if(dy>80){
-      sheet.style.transform='';
-      closeModal(modal.id);
+    const dy=lastY-startY;
+    // Dismiss on large drag OR fast flick
+    if(dy>110||vel>0.45){
+      sheet.style.transition='transform 0.36s cubic-bezier(0.32,0.72,0,1)';
+      sheet.style.transform='translateY(110%)';
+      setTimeout(()=>{
+        sheet.style.transform='';
+        sheet.style.transition='';
+        closeModal(modal.id);
+      },360);
     } else {
+      sheet.style.transition='transform 0.42s cubic-bezier(0.32,0.72,0,1)';
       sheet.style.transform='';
+      setTimeout(()=>sheet.style.transition='',420);
     }
-  },{passive:false});
+  };
+  document.addEventListener('touchend',finish,{passive:true,capture:true});
+  document.addEventListener('touchcancel',finish,{passive:true,capture:true});
 }
 
 // ── TABS ───────────────────────────────────────────────────
