@@ -284,6 +284,17 @@ html,body{height:100%;background:var(--bg);color:var(--t1);
 .save-btn:active:not(:disabled){transform:scale(0.97);opacity:.88}
 .save-btn:disabled{opacity:.35;cursor:default}
 .step-hint{font-size:13px;color:var(--t3);margin-bottom:14px}
+
+/* Settings */
+.settings-card{background:var(--s1);border-radius:16px;padding:16px;display:flex;flex-direction:column;gap:8px}
+.settings-card-title{font-size:17px;font-weight:600}
+.settings-card-desc{font-size:13px;color:var(--t3);line-height:1.5}
+.settings-btn-row{display:flex;gap:8px;margin-top:4px}
+.settings-btn{flex:1;background:var(--s2);border:none;color:var(--t1);font-size:15px;font-weight:600;
+  font-family:inherit;padding:12px;border-radius:12px;cursor:pointer;
+  transition:transform 0.15s var(--ease-out),opacity 0.15s}
+.settings-btn:active{transform:scale(0.96);opacity:.7}
+.settings-btn.accent{background:var(--accent);color:#fff}
 </style>
 </head>
 <body>
@@ -322,6 +333,31 @@ html,body{height:100%;background:var(--bg);color:var(--t1);
   </div>
 </section>
 
+<section id="sec-settings" class="section">
+  <span class="section-title">Settings</span>
+
+  <div class="settings-card">
+    <div class="settings-card-title">Recipe Assistant Prompt</div>
+    <div class="settings-card-desc">Paste this into a new Claude chat to generate properly formatted recipe JSON files for import into the app.</div>
+    <div class="settings-btn-row">
+      <button class="settings-btn accent" onclick="copyRecipePrompt()">Copy Prompt</button>
+      <button class="settings-btn" onclick="downloadRecipePrompt()">Download</button>
+    </div>
+    <div id="prompt-copy-confirm" style="display:none;font-size:13px;color:var(--green);margin-top:8px;text-align:center">Copied to clipboard!</div>
+  </div>
+
+  <div class="settings-card">
+    <div class="settings-card-title">Pantry</div>
+    <div class="settings-card-desc">Clear all saved pantry quantities. You'll need to re-enter what you have before your next shop.</div>
+    <button class="settings-btn" onclick="clearAllPantry()">Clear Pantry</button>
+  </div>
+
+  <div class="settings-card">
+    <div class="settings-card-title">Rotation</div>
+    <div class="settings-card-desc">Meal rotation starts June 22, 2026. Sam's Club bulk shop every 14 days starting June 21, 2026.</div>
+  </div>
+</section>
+
 </div>
 
 <nav id="tab-bar">
@@ -337,8 +373,12 @@ html,body{height:100%;background:var(--bg);color:var(--t1);
     <svg viewBox="0 0 24 24"><path d="M7 18c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2zM1 2v2h2l3.6 7.59L5.25 14c-.16.28-.25.61-.25.96C5 16.1 5.9 17 7 17h14v-2H7.42c-.14 0-.25-.11-.25-.25l.03-.12.9-1.63H19c.75 0 1.41-.41 1.75-1.03l3.58-6.49A1 1 0 0023.54 4H5.21l-.94-2H1zm16 16c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2z"/></svg>
     <span>Shopping</span>
   </button>
+  <button class="tab" data-sec="sec-settings" onclick="showSection('sec-settings')">
+    <svg viewBox="0 0 24 24"><path d="M19.14 12.94c.04-.3.06-.61.06-.94s-.02-.64-.07-.94l2.03-1.58c.18-.14.23-.41.12-.61l-1.92-3.32c-.12-.22-.37-.29-.59-.22l-2.39.96c-.5-.38-1.03-.7-1.62-.94l-.36-2.54c-.04-.24-.24-.41-.48-.41h-3.84c-.24 0-.43.17-.47.41l-.36 2.54c-.59.24-1.13.57-1.62.94l-2.39-.96c-.22-.08-.47 0-.59.22L2.74 8.87c-.12.21-.08.47.12.61l2.03 1.58c-.05.3-.09.63-.09.94s.02.64.07.94l-2.03 1.58c-.18.14-.23.41-.12.61l1.92 3.32c.12.22.37.29.59.22l2.39-.96c.5.38 1.03.7 1.62.94l.36 2.54c.05.24.24.41.48.41h3.84c.24 0 .44-.17.47-.41l.36-2.54c.59-.24 1.13-.56 1.62-.94l2.39.96c.22.08.47 0 .59-.22l1.92-3.32c.12-.22.07-.47-.12-.61l-2.01-1.58zM12 15.6c-1.98 0-3.6-1.62-3.6-3.6s1.62-3.6 3.6-3.6 3.6 1.62 3.6 3.6-1.62 3.6-3.6 3.6z"/></svg>
+    <span>Settings</span>
+  </button>
 </nav>
-<div id="version-badge">v2.9</div>
+<div id="version-badge">v3.0</div>
 
 <div id="modal-recipe" class="modal hidden">
   <div class="modal-bd" onclick="closeModal('modal-recipe')"></div>
@@ -1095,6 +1135,75 @@ function toggleShopItem(key){
     });
   }
 }
+// ── SETTINGS ───────────────────────────────────────────────
+const RECIPE_PROMPT = `# Meal Plan Recipe Assistant
+
+You are a recipe assistant for Brody and Mackenzie's meal rotation app. When given a recipe idea, output a single valid JSON object that can be imported directly into their app.
+
+## Who this is for
+- Brody has Type 1 diabetes (blood sugar is a real concern). Every recipe needs a bloodSugarNote.
+- Mackenzie eats the same meals. Recipes are for 4 servings (they eat leftovers).
+- They like simple, practical meals. Real food, easy cleanup.
+
+## Macro targets (per serving)
+- Calories: 650 (range 580–730)
+- Protein: 68g (range 52–77g) — priority
+- Carbs: 50g (range 18–62g)
+- Fat: 22g (range 12–40g)
+
+## Cooking methods (use exactly one)
+"stovetop", "oven", or "crockpot"
+
+## JSON schema
+{
+  "id": "kebab-case-unique-id",
+  "name": "Human Readable Recipe Name",
+  "method": "stovetop",
+  "prepTime": 10,
+  "cookTime": 25,
+  "servings": 4,
+  "ingredients": ["2.5 lbs boneless skinless chicken thighs", "..."],
+  "steps": ["Step one.", "Step two.", "..."],
+  "macros": { "calories": 650, "protein": 68, "carbs": 50, "fat": 22 },
+  "estimatedCost": 12,
+  "bloodSugarNote": "How this meal affects blood sugar and tips to minimize spikes."
+}
+
+## Field rules
+- id: lowercase, hyphens only, unique (e.g. "smash-burgers", "slow-cooker-pulled-pork")
+- prepTime / cookTime: integers in minutes
+- servings: always 4
+- ingredients: full strings with quantity, unit, prep note
+- steps: clear steps a beginner can follow, with temps and doneness cues
+- macros: integers per serving
+- estimatedCost: integer, total USD for 4 servings
+- bloodSugarNote: 1–3 sentences on glycemic impact, what buffers blood sugar (protein/fat/fiber), practical tips
+
+## How to use
+Describe the recipe in plain English. Claude will output the JSON.
+Save it as a .json file, open the Meal Plan app → Meals → Import Recipe JSON → pick the file → choose a date.`;
+
+function copyRecipePrompt(){
+  navigator.clipboard.writeText(RECIPE_PROMPT).then(()=>{
+    const el=document.getElementById('prompt-copy-confirm');
+    el.style.display='block';
+    setTimeout(()=>el.style.display='none',2500);
+  });
+}
+function downloadRecipePrompt(){
+  const blob=new Blob([RECIPE_PROMPT],{type:'text/markdown'});
+  const a=document.createElement('a');
+  a.href=URL.createObjectURL(blob);
+  a.download='recipe-prompt.md';
+  a.click();
+  URL.revokeObjectURL(a.href);
+}
+function clearAllPantry(){
+  if(!confirm('Clear all pantry quantities?'))return;
+  lsSet(LS.pantry,{});
+  alert('Pantry cleared.');
+}
+
 function resetShopList(){
   const checked=lsGet(LS.shop,{});
   delete checked[getShopKey()];
