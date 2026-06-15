@@ -346,6 +346,10 @@ html,body{height:100%;background:var(--bg);color:var(--t1);
     <span class="section-title">Shopping</span>
     <div id="shop-tabs" class="pill-tabs"></div>
     <div id="shop-store-toggle" class="store-toggle"></div>
+    <div id="cart-total-bar" style="display:none;background:var(--s1);border-radius:12px;padding:10px 14px;display:none;flex-direction:row;align-items:baseline;justify-content:space-between;gap:8px">
+      <span style="font-size:13px;color:var(--t3)">Estimated total</span>
+      <span id="cart-total-amount" style="font-size:20px;font-weight:700;color:var(--accent)"></span>
+    </div>
   </div>
   <div style="flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch;padding:0 16px calc(var(--tab) + env(safe-area-inset-bottom,0px) + 20px)">
     <div id="shop-items"></div>
@@ -408,7 +412,7 @@ html,body{height:100%;background:var(--bg);color:var(--t1);
     <span>Settings</span>
   </button>
 </nav>
-<div id="version-badge">v3.2</div>
+<div id="version-badge">v3.3</div>
 
 <div id="modal-recipe" class="modal hidden">
   <div class="modal-bd" onclick="closeModal('modal-recipe')"></div>
@@ -1122,6 +1126,7 @@ function renderShopItems(){
     }
     container.appendChild(catEl);
   });
+  updateCartTotal(groups,pantry);
 }
 function openPantryInput(key,display,unit){
   const existing=document.getElementById('pantry-input-row');
@@ -1384,6 +1389,104 @@ function closePriceEdit(row,item){
 function _findItem(key){
   for(const g of PRICE_GROUPS)for(const it of g.items)if(it.key===key)return it;
   return null;
+}
+
+// Maps normalized shopping-list ingredient keys → {priceKey, cupFactor}
+// cupFactor: lbs per cup (for unit-converting cup quantities to lb price)
+const PRICE_MATCH=[
+  {kws:['chicken thigh'],          priceKey:'chicken-thighs',  unit:'lb'},
+  {kws:['ground beef'],            priceKey:'ground-beef',     unit:'lb'},
+  {kws:['ground turkey'],          priceKey:'ground-turkey',   unit:'lb'},
+  {kws:['pork shoulder'],          priceKey:'pork-shoulder',   unit:'lb'},
+  {kws:['pork loin roast','pork loin'], priceKey:'pork-loin',  unit:'lb'},
+  {kws:['pork tenderloin'],        priceKey:'pork-tenderloin', unit:'lb'},
+  {kws:['smoked beef','sausage'],  priceKey:'smoked-sausage',  unit:'lb'},
+  {kws:['salmon'],                 priceKey:'salmon',          unit:'lb'},
+  {kws:['shrimp'],                 priceKey:'shrimp',          unit:'lb'},
+  {kws:['cod'],                    priceKey:'cod',             unit:'lb'},
+  {kws:['tuna','albacore'],        priceKey:'tuna-can',        unit:'can'},
+  {kws:['yukon gold potato','potato'], priceKey:'potatoes',   unit:'lb', exclude:['sweet','baby']},
+  {kws:['baby potato'],            priceKey:'baby-potatoes',   unit:'lb'},
+  {kws:['sweet potato'],           priceKey:'sweet-potatoes',  unit:'lb'},
+  {kws:['broccoli'],               priceKey:'broccoli',        unit:'lb'},
+  {kws:['spinach'],                priceKey:'baby-spinach',    unit:'lb'},
+  {kws:['black bean'],             priceKey:'black-beans-can', unit:'can'},
+  {kws:['cannellini','white bean'],priceKey:'white-beans-can', unit:'can'},
+  {kws:['chicken broth'],          priceKey:'chicken-broth',   unit:'cup', cupFactor:0.25},
+  {kws:['beef broth'],             priceKey:'beef-broth',      unit:'cup', cupFactor:0.25},
+  {kws:['pasta sauce','marinara'], priceKey:'pasta-sauce',     unit:'jar'},
+  {kws:['brown rice'],             priceKey:'brown-rice',      unit:'lb'},
+  {kws:['white rice'],             priceKey:'white-rice',      unit:'lb'},
+  {kws:['spaghetti','linguine','penne'],priceKey:'pasta',      unit:'lb'},
+  {kws:['egg noodle'],             priceKey:'egg-noodles',     unit:'lb'},
+  {kws:['tortellini'],             priceKey:'tortellini',      unit:'lb'},
+  {kws:['ravioli'],                priceKey:'ravioli',         unit:'lb'},
+  {kws:['bowtie','farfalle'],      priceKey:'bowtie-pasta',    unit:'lb'},
+  {kws:['mexican cheese'],         priceKey:'mexican-blend',   unit:'cup', cupFactor:0.25},
+  {kws:['cheddar'],                priceKey:'cheddar',         unit:'cup', cupFactor:0.25},
+  {kws:['parmesan'],               priceKey:'parmesan',        unit:'cup', cupFactor:0.22},
+  {kws:['mozzarella'],             priceKey:'mozzarella',      unit:'cup', cupFactor:0.25},
+  {kws:['ricotta'],                priceKey:'ricotta',         unit:'lb'},
+  {kws:['sour cream'],             priceKey:'sour-cream',      unit:'cup', cupFactor:0.5},
+  {kws:['heavy cream'],            priceKey:'heavy-cream',     unit:'cup', cupFactor:0.5},
+  {kws:['cream cheese'],           priceKey:'cream-cheese',    unit:'lb'},
+  {kws:['eggs','large egg'],       priceKey:'eggs',            unit:'each'},
+  {kws:['butter'],                 priceKey:'butter',          unit:'cup', cupFactor:0.5},
+];
+
+function matchPriceItem(shopKey){
+  for(const m of PRICE_MATCH){
+    if(m.exclude&&m.exclude.some(ex=>shopKey.includes(ex)))continue;
+    if(m.kws.some(kw=>shopKey.includes(kw)))return m;
+  }
+  return null;
+}
+
+function computeCartTotal(groups,pantry){
+  let total=0;
+  for(const g of groups){
+    for(const si of g.items){
+      const raw=parseDisplayQty(si.display);
+      if(raw.qty===null)continue;
+      const haveQty=parseFloat(pantry[si.key])||0;
+      const buyQty=Math.max(0,raw.qty-haveQty);
+      if(buyQty<=0)continue;
+      const m=matchPriceItem(si.key);
+      if(!m)continue;
+      const pItem=_findItem(m.priceKey);
+      if(!pItem)continue;
+      const price=getPrice(m.priceKey,pItem.def);
+      const unit=raw.unit||'';
+      let effectiveQty=null;
+      if(m.unit==='lb'){
+        if(unit==='lbs'||unit==='lb')effectiveQty=buyQty;
+        else if(unit==='oz')effectiveQty=buyQty/16;
+      } else if(m.unit==='can'){
+        if(unit==='can')effectiveQty=buyQty;
+      } else if(m.unit==='jar'){
+        if(unit==='jar')effectiveQty=buyQty;
+      } else if(m.unit==='cup'&&m.cupFactor){
+        if(unit==='cup')effectiveQty=buyQty*m.cupFactor;
+        else if(unit==='lbs'||unit==='lb')effectiveQty=buyQty;
+        else if(unit==='oz')effectiveQty=buyQty/16;
+      } else if(m.unit==='each'){
+        if(!unit||unit==='')effectiveQty=buyQty/12; // eggs: count → dozens
+        else if(unit==='dozen')effectiveQty=buyQty;
+      }
+      if(effectiveQty!==null)total+=effectiveQty*price;
+    }
+  }
+  return total;
+}
+
+function updateCartTotal(groups,pantry){
+  const bar=document.getElementById('cart-total-bar');
+  const amt=document.getElementById('cart-total-amount');
+  if(!bar||!amt)return;
+  if(!groups.length){bar.style.display='none';return;}
+  const total=computeCartTotal(groups,pantry);
+  amt.textContent=`~$${total.toFixed(2)}`;
+  bar.style.display='flex';
 }
 
 function clearAllPantry(){
