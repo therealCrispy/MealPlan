@@ -1136,7 +1136,8 @@ function openModal(id){
 function closeModal(id){
   const el=document.getElementById(id);
   el.classList.remove('open');
-  setTimeout(()=>el.classList.remove('visible'),420);
+  el.style.pointerEvents='none';
+  setTimeout(()=>{el.classList.remove('visible');el.style.pointerEvents='';},420);
 }
 function setupSwipeToDismiss(modal){
   const sheet=modal.querySelector('.modal-sheet');
