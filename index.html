@@ -324,7 +324,7 @@ html,body{height:100%;background:var(--bg);color:var(--t1);
     <span>Shopping</span>
   </button>
 </nav>
-<div id="version-badge">v2.1</div>
+<div id="version-badge">v2.2</div>
 
 <div id="modal-recipe" class="modal hidden">
   <div class="modal-bd" onclick="closeModal('modal-recipe')"></div>
@@ -692,26 +692,25 @@ function setupCalSwipe(){
     }
   },{passive:true});
 }
-function calNav(dir,animDir){
+function calNav(dir,dragOffset){
   const cards=document.getElementById('cal-cards');
-  const outDir=animDir??dir;
-  // Slide current week out
-  cards.style.transition='transform 0.28s var(--ease-out),opacity 0.28s';
-  cards.style.transform=`translateY(${outDir<0?'-':'+'}60px)`;
-  cards.style.opacity='0';
+  const h=cards.offsetHeight;
+  const exitY=dir<0?-h:h; // swipe up → exit up, swipe down → exit down
+  const enterY=dir<0?h:-h;
+  // If user already dragged partway, start from current position
+  const startY=dragOffset??0;
+  cards.style.transition='transform 0.3s var(--ease-out)';
+  cards.style.transform=`translateY(${exitY}px)`;
   setTimeout(()=>{
     calStart=new Date(calStart);calStart.setDate(calStart.getDate()+dir*7);
     renderCalendar();
-    // New week slides in from opposite side
     const fresh=document.getElementById('cal-cards');
     fresh.style.transition='none';
-    fresh.style.transform=`translateY(${outDir<0?'+':'-'}60px)`;
-    fresh.style.opacity='0';
+    fresh.style.transform=`translateY(${enterY}px)`;
     requestAnimationFrame(()=>requestAnimationFrame(()=>{
-      fresh.style.transition='transform 0.32s var(--spring),opacity 0.28s';
+      fresh.style.transition='transform 0.32s var(--spring)';
       fresh.style.transform='translateY(0)';
-      fresh.style.opacity='1';
-      setTimeout(()=>{fresh.style.transition='';fresh.style.opacity='';},350);
+      setTimeout(()=>fresh.style.transition='',350);
     }));
   },240);
 }
