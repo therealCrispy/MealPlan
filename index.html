@@ -1137,31 +1137,49 @@ function closeModal(id){
 function setupSwipeToDismiss(modal){
   const sheet=modal.querySelector('.modal-sheet');
   const handle=modal.querySelector('.modal-handle');
+  const body=modal.querySelector('.modal-body');
   if(!sheet||!handle||sheet._swipeSetup)return;
   sheet._swipeSetup=true;
 
   let startY=0,lastY=0,lastT=0,vel=0,dragging=false;
 
-  // Handle is OUTSIDE the scroll container — iOS PWA won't intercept these touches
-  handle.addEventListener('touchstart',e=>{
-    e.preventDefault();
-    startY=lastY=e.touches[0].clientY;
+  function startDrag(y){
+    startY=lastY=y;
     lastT=Date.now();vel=0;dragging=true;
     sheet.style.transition='none';
+  }
+
+  // Always-on drag zone: the handle pill at the top (outside scroll container)
+  handle.addEventListener('touchstart',e=>{
+    e.preventDefault();
+    startDrag(e.touches[0].clientY);
   },{passive:false});
+
+  // Anywhere on the sheet when scrolled to top — same as every iOS sheet
+  sheet.addEventListener('touchstart',e=>{
+    if(dragging)return;
+    // Only hijack if the scrollable body is at the very top
+    if(body&&body.scrollTop>0)return;
+    const y=e.touches[0].clientY;
+    startDrag(y);
+    // Don't preventDefault here — let it be passive so scroll still works normally
+    // We'll cancel the scroll in touchmove if they actually drag down
+  },{passive:true});
 
   document.addEventListener('touchmove',e=>{
     if(!dragging)return;
-    e.preventDefault();
     const now=Date.now(),y=e.touches[0].clientY;
+    const dy=y-startY;
+    // Only take over if dragging downward; otherwise release control so scroll works
+    if(dy<=0){dragging=false;return;}
+    e.preventDefault();
     const dt=now-lastT;
     if(dt>0)vel=(y-lastY)/dt;
     lastY=y;lastT=now;
-    const dy=Math.max(0,y-startY);
-    sheet.style.transform=`translateY(${dy}px)`;
+    sheet.style.transform=`translateY(${Math.max(0,dy)}px)`;
   },{passive:false,capture:true});
 
-  const finish=e=>{
+  const finish=()=>{
     if(!dragging)return;
     dragging=false;
     const dy=lastY-startY;
