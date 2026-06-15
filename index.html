@@ -324,7 +324,7 @@ html,body{height:100%;background:var(--bg);color:var(--t1);
     <span>Shopping</span>
   </button>
 </nav>
-<div id="version-badge">v2.5</div>
+<div id="version-badge">v2.6</div>
 
 <div id="modal-recipe" class="modal hidden">
   <div class="modal-bd" onclick="closeModal('modal-recipe')"></div>
@@ -705,8 +705,8 @@ function setupCalSwipe(){
     const sp='transform 0.36s var(--spring)';
     const teardown=(committed)=>{
       const dir=_calDragDir,clone=_calClone,wrap=clipWrap;
-      setTimeout(()=>{
-        // Move #cal-cards back out of clipWrap, restore it
+      // Wait past animation end, then batch all DOM surgery into one rAF
+      setTimeout(()=>requestAnimationFrame(()=>{
         wrap.parentElement.insertBefore(cards,wrap);
         wrap.remove();
         clone.remove();
@@ -717,7 +717,7 @@ function setupCalSwipe(){
           renderCalendar();
         }
         _calDragDir=0;_calSwiping=false;
-      },360);
+      }),390);
     };
     if(commit){
       const exitY=_calDragDir>0?-h:h;
