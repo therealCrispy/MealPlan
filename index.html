@@ -11,14 +11,29 @@
 <style>
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
 :root{
-  --bg:#0a0a0a;--s1:#1c1c1e;--s2:#2c2c2e;--s3:#3a3a3c;
-  --accent:#0a84ff;--green:#30d158;--orange:#ff9f0a;--red:#ff453a;--yellow:#ffd60a;
-  --t1:#ffffff;--t2:rgba(235,235,245,0.8);--t3:rgba(235,235,245,0.55);
+  /* Claude dark */
+  --bg:#1c1917;--s1:#262420;--s2:#302e2a;--s3:#3d3a36;
+  --accent:#c96442;--green:#3a9e6e;--orange:#d4845a;--red:#d45a5a;--yellow:#c9a442;
+  --t1:#ece9e4;--t2:rgba(236,233,228,0.78);--t3:rgba(236,233,228,0.48);
+  --accent-tint:rgba(201,100,66,0.15);--green-tint:rgba(58,158,110,0.13);--orange-tint:rgba(212,132,90,0.15);
+  --tab-bg:rgba(24,22,19,0.96);--tab-bg-pwa:rgba(18,16,14,0.98);
+  --border:rgba(255,255,255,0.1);--divider:rgba(255,255,255,0.07);
+  --close-btn:rgba(60,55,50,0.7);
   --tab:49px;
   --spring:cubic-bezier(0.32,0.72,0,1);
   --spring-bounce:cubic-bezier(0.34,1.56,0.64,1);
   --ease-out:cubic-bezier(0.25,0.46,0.45,0.94);
 }
+@media(prefers-color-scheme:light){:root{
+  /* Claude light */
+  --bg:#faf8f5;--s1:#ffffff;--s2:#f0ede8;--s3:#e0dcd5;
+  --accent:#c96442;--green:#2d8a5e;--orange:#c47040;--red:#b84040;--yellow:#a87c28;
+  --t1:#1a1815;--t2:rgba(26,24,21,0.7);--t3:rgba(26,24,21,0.45);
+  --accent-tint:rgba(201,100,66,0.12);--green-tint:rgba(45,138,94,0.12);--orange-tint:rgba(196,112,64,0.12);
+  --tab-bg:rgba(250,248,245,0.94);--tab-bg-pwa:rgba(250,248,245,0.98);
+  --border:rgba(0,0,0,0.09);--divider:rgba(0,0,0,0.07);
+  --close-btn:rgba(0,0,0,0.14);
+}}
 html,body{height:100%;background:var(--bg);color:var(--t1);
   font-family:-apple-system,'Helvetica Neue',sans-serif;
   overscroll-behavior:none;-webkit-tap-highlight-color:transparent;touch-action:manipulation}
@@ -49,11 +64,11 @@ html,body{height:100%;background:var(--bg);color:var(--t1);
 #tab-bar{position:fixed;bottom:0;left:0;right:0;
   height:calc(var(--tab) + env(safe-area-inset-bottom,34px));
   padding-bottom:env(safe-area-inset-bottom,34px);
-  background:rgba(18,18,20,0.96);backdrop-filter:blur(24px);-webkit-backdrop-filter:blur(24px);
-  border-top:0.5px solid rgba(255,255,255,0.12);
+  background:var(--tab-bg);backdrop-filter:blur(24px);-webkit-backdrop-filter:blur(24px);
+  border-top:0.5px solid var(--border);
   display:flex;align-items:flex-start;padding-top:8px;z-index:100}
 @media(display-mode:standalone){
-  #tab-bar{background:rgba(12,12,14,0.98)}
+  #tab-bar{background:var(--tab-bg-pwa)}
 }
 .tab{flex:1;display:flex;flex-direction:column;align-items:center;gap:3px;
   background:none;border:none;color:var(--t3);font-size:10px;font-family:inherit;
@@ -115,9 +130,9 @@ html,body{height:100%;background:var(--bg);color:var(--t1);
   touch-action:none;user-select:none;-webkit-user-select:none;line-height:1}
 .meal-num{font-size:12px;color:var(--t3);min-width:20px;text-align:right;font-variant-numeric:tabular-nums}
 .mbadge{font-size:10px;font-weight:700;padding:2px 7px;border-radius:6px;flex-shrink:0}
-.mbadge-stovetop{background:rgba(10,132,255,.18);color:var(--accent)}
-.mbadge-oven{background:rgba(255,159,10,.18);color:var(--orange)}
-.mbadge-crockpot{background:rgba(48,209,88,.18);color:var(--green)}
+.mbadge-stovetop{background:var(--accent-tint);color:var(--accent)}
+.mbadge-oven{background:var(--orange-tint);color:var(--orange)}
+.mbadge-crockpot{background:var(--green-tint);color:var(--green)}
 .meal-info{flex:1;min-width:0;cursor:pointer}
 .meal-name{font-size:15px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .meal-macros{font-size:11px;color:var(--t3);margin-top:1px}
@@ -151,7 +166,7 @@ html,body{height:100%;background:var(--bg);color:var(--t1);
 .shop-cat-title{font-size:11px;font-weight:700;color:var(--t3);
   text-transform:uppercase;letter-spacing:.8px;padding:12px 0 6px}
 .shop-item{display:flex;align-items:center;gap:12px;
-  padding:12px 0;border-bottom:0.5px solid rgba(255,255,255,0.07);cursor:pointer;
+  padding:12px 0;border-bottom:0.5px solid var(--divider);cursor:pointer;
   transition:opacity 0.2s}
 .shop-item:last-child{border-bottom:none}
 .shop-item:active{opacity:.6}
@@ -191,7 +206,7 @@ html,body{height:100%;background:var(--bg);color:var(--t1);
 .modal-body{flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch;
   padding:0 20px;
   padding-bottom:max(28px,calc(env(safe-area-inset-bottom,0px) + 28px))}
-.modal-close{position:absolute;top:20px;right:16px;background:rgba(60,60,67,0.6);
+.modal-close{position:absolute;top:20px;right:16px;background:var(--close-btn);
   border:none;color:var(--t1);width:30px;height:30px;border-radius:50%;
   font-size:14px;font-weight:600;display:flex;align-items:center;justify-content:center;
   cursor:pointer;z-index:10;transition:transform 0.15s var(--ease-out),opacity 0.15s}
@@ -206,11 +221,11 @@ html,body{height:100%;background:var(--bg);color:var(--t1);
 .macro-lbl{font-size:10px;color:var(--t3);margin-top:2px;text-transform:uppercase;letter-spacing:.3px}
 .rm-sec{font-size:11px;font-weight:700;color:var(--t3);
   text-transform:uppercase;letter-spacing:.8px;margin:18px 0 8px}
-.rm-ing{font-size:15px;padding:8px 0;border-bottom:0.5px solid rgba(255,255,255,0.07);color:var(--t2)}
-.rm-step{font-size:15px;padding:10px 0;border-bottom:0.5px solid rgba(255,255,255,0.07);
+.rm-ing{font-size:15px;padding:8px 0;border-bottom:0.5px solid var(--divider);color:var(--t2)}
+.rm-step{font-size:15px;padding:10px 0;border-bottom:0.5px solid var(--divider);
   line-height:1.5;display:flex;gap:12px;color:var(--t2)}
 .step-n{font-weight:700;color:var(--accent);flex-shrink:0;width:18px}
-.bs-box{background:rgba(48,209,88,.08);border:1px solid rgba(48,209,88,.2);
+.bs-box{background:var(--green-tint);border:1px solid rgba(58,158,110,.25);
   border-radius:14px;padding:14px;margin-top:18px;font-size:14px;color:var(--t2);line-height:1.6}
 .bs-lbl{font-size:11px;font-weight:700;color:var(--green);
   text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px}
@@ -230,7 +245,7 @@ html,body{height:100%;background:var(--bg);color:var(--t1);
 /* Mini calendar */
 .mini-cal{background:var(--s2);border-radius:14px;overflow:hidden}
 .mini-cal-hdr{display:flex;align-items:center;justify-content:space-between;
-  padding:12px 14px;border-bottom:0.5px solid rgba(255,255,255,0.08)}
+  padding:12px 14px;border-bottom:0.5px solid var(--divider)}
 .mini-cal-title{font-size:16px;font-weight:700}
 .mini-nav{background:none;border:none;color:var(--accent);
   font-size:20px;cursor:pointer;padding:4px 12px;
@@ -306,7 +321,7 @@ html,body{height:100%;background:var(--bg);color:var(--t1);
     <span>Shopping</span>
   </button>
 </nav>
-<div id="version-badge">v1.6</div>
+<div id="version-badge">v1.7</div>
 
 <div id="modal-recipe" class="modal hidden">
   <div class="modal-bd" onclick="closeModal('modal-recipe')"></div>
