@@ -147,6 +147,7 @@ html,body{height:100%;background:var(--bg);color:var(--t1);
 .act-btn:active{transform:scale(0.87)}
 .act-btn.muted-on{color:var(--orange)}
 .act-btn.del{color:var(--red)}
+.act-btn.shuffle{color:var(--t3);font-size:16px}
 #add-recipe-btn{width:100%;background:none;border:1.5px dashed var(--s3);
   color:var(--accent);font-size:15px;font-weight:600;font-family:inherit;
   padding:14px;border-radius:14px;cursor:pointer;margin-top:2px;
@@ -378,7 +379,7 @@ html,body{height:100%;background:var(--bg);color:var(--t1);
     <span>Settings</span>
   </button>
 </nav>
-<div id="version-badge">v3.0</div>
+<div id="version-badge">v3.1</div>
 
 <div id="modal-recipe" class="modal hidden">
   <div class="modal-bd" onclick="closeModal('modal-recipe')"></div>
@@ -902,6 +903,7 @@ function renderMeals(){
         <div class="meal-macros">${m.macros.calories} cal · ${m.macros.protein}g protein</div>
       </div>
       <div class="meal-acts">
+        <button class="act-btn shuffle" title="Shuffle to random position" onclick="shuffleMeal('${id}')">⇄</button>
         <button class="act-btn${isMuted?' muted-on':''}" title="${isMuted?'Unmute':'Mute'}" onclick="toggleMute('${id}')">&#9679;</button>
         <button class="act-btn del" title="Delete" onclick="deleteMeal('${id}')">&#10005;</button>
       </div>`;
@@ -914,6 +916,15 @@ function toggleMute(id){
   const idx=m.indexOf(id);
   if(idx>=0)m.splice(idx,1);else m.push(id);
   lsSet(LS.muted,m);renderMeals();renderCalendar();
+}
+function shuffleMeal(id){
+  const rot=getRotation();
+  const from=rot.indexOf(id);
+  if(from<0)return;
+  rot.splice(from,1);
+  const to=Math.floor(Math.random()*rot.length);
+  rot.splice(to,0,id);
+  lsSet(LS.rot,rot);renderMeals();renderCalendar();
 }
 function deleteMeal(id){
   if(!confirm(`Remove "${getAllMeals()[id]?.name||id}" from rotation?`))return;
