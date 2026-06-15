@@ -198,6 +198,8 @@ html,body{height:100%;background:var(--bg);color:var(--t1);
   <span class="section-title">Meals</span>
   <div id="meals-list"></div>
   <button id="add-recipe-btn" onclick="openAddModal()">+ Add Recipe</button>
+  <button id="add-recipe-btn" onclick="document.getElementById('import-json-input').click()" style="margin-top:0">⬆ Import Recipe JSON</button>
+  <input type="file" id="import-json-input" accept=".json" style="display:none" onchange="importRecipeJSON(this)">
 </section>
 
 <section id="sec-shopping" class="section" style="padding:0;gap:0;overflow:hidden">
@@ -933,6 +935,44 @@ function saveCustomRecipe(){
   const ins=lsGet(LS.ins,[]);ins.push({id,firstDate:fmtKey(addPickedDate)});lsSet(LS.ins,ins);
   closeModal('modal-add');
   renderMeals();renderCalendar();
+}
+
+function importRecipeJSON(input){
+  const file=input.files[0];
+  if(!file)return;
+  const reader=new FileReader();
+  reader.onload=e=>{
+    try{
+      const data=JSON.parse(e.target.result);
+      const recipes=Array.isArray(data)?data:[data];
+      let added=0;
+      recipes.forEach(r=>{
+        if(!r.name||!r.ingredients||!r.steps){return;}
+        const id=r.id||`custom-${Date.now()}-${Math.random().toString(36).slice(2,6)}`;
+        const recipe={
+          name:r.name,
+          method:r.method||'stovetop',
+          prepTime:r.prepTime||15,
+          cookTime:r.cookTime||30,
+          servings:r.servings||4,
+          ingredients:r.ingredients,
+          steps:r.steps,
+          macros:r.macros||{calories:0,protein:0,carbs:0,fat:0},
+          estimatedCost:r.estimatedCost||0,
+          bloodSugarNote:r.bloodSugarNote||''
+        };
+        const custom=lsGet(LS.custom,{});custom[id]=recipe;lsSet(LS.custom,custom);
+        const rot=getRotation();rot.push(id);lsSet(LS.rot,rot);
+        added++;
+      });
+      input.value='';
+      renderMeals();renderCalendar();
+      alert(`${added} recipe${added!==1?'s':''} imported successfully!`);
+    }catch(err){
+      alert('Invalid JSON file. Make sure it matches the recipe format.');
+    }
+  };
+  reader.readAsText(file);
 }
 
 // ── MODALS ─────────────────────────────────────────────────
