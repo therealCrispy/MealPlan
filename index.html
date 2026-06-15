@@ -306,7 +306,7 @@ html,body{height:100%;background:var(--bg);color:var(--t1);
     <span>Shopping</span>
   </button>
 </nav>
-<div id="version-badge">v1.5</div>
+<div id="version-badge">v1.6</div>
 
 <div id="modal-recipe" class="modal hidden">
   <div class="modal-bd" onclick="closeModal('modal-recipe')"></div>
@@ -1125,8 +1125,11 @@ function confirmImport(skip=false){
 }
 
 // ── MODALS ─────────────────────────────────────────────────
+const _modalTimers={};
 function openModal(id){
   const el=document.getElementById(id);
+  clearTimeout(_modalTimers[id]);
+  el.style.pointerEvents='';
   el.classList.add('visible');
   requestAnimationFrame(()=>requestAnimationFrame(()=>{
     el.classList.add('open');
@@ -1137,7 +1140,7 @@ function closeModal(id){
   const el=document.getElementById(id);
   el.classList.remove('open');
   el.style.pointerEvents='none';
-  setTimeout(()=>{el.classList.remove('visible');el.style.pointerEvents='';},420);
+  _modalTimers[id]=setTimeout(()=>{el.classList.remove('visible');el.style.pointerEvents='';},420);
 }
 function setupSwipeToDismiss(modal){
   const sheet=modal.querySelector('.modal-sheet');
