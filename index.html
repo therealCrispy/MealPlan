@@ -286,6 +286,25 @@ html,body{height:100%;background:var(--bg);color:var(--t1);
 .save-btn:disabled{opacity:.35;cursor:default}
 .step-hint{font-size:13px;color:var(--t3);margin-bottom:14px}
 
+/* Pricing */
+.price-group{display:flex;flex-direction:column;gap:2px}
+.price-group-title{font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--t3);
+  padding:14px 4px 6px}
+.price-row{display:flex;align-items:center;background:var(--s1);padding:12px 14px;gap:10px;cursor:pointer;
+  transition:background .12s}
+.price-row:first-of-type{border-radius:14px 14px 0 0}
+.price-row:last-of-type{border-radius:0 0 14px 14px}
+.price-row:only-of-type{border-radius:14px}
+.price-row:not(:last-of-type){border-bottom:1px solid var(--divider)}
+.price-row:active{background:var(--s2)}
+.price-label{flex:1;font-size:15px}
+.price-unit{font-size:12px;color:var(--t3);margin-right:4px}
+.price-val{font-size:15px;font-weight:600;color:var(--accent);min-width:44px;text-align:right}
+.price-input-wrap{display:flex;align-items:center;gap:6px;flex:1;justify-content:flex-end}
+.price-input{background:var(--s2);border:1.5px solid var(--accent);color:var(--t1);font-size:16px;
+  font-family:inherit;font-weight:600;width:80px;padding:4px 8px;border-radius:8px;text-align:right;outline:none}
+.price-reset{font-size:12px;color:var(--t3);text-decoration:underline;cursor:pointer;padding:4px;white-space:nowrap}
+
 /* Settings */
 .settings-card{background:var(--s1);border-radius:16px;padding:16px;display:flex;flex-direction:column;gap:8px}
 .settings-card-title{font-size:17px;font-weight:600}
@@ -334,6 +353,12 @@ html,body{height:100%;background:var(--bg);color:var(--t1);
   </div>
 </section>
 
+<section id="sec-pricing" class="section">
+  <span class="section-title">Pricing</span>
+  <div style="font-size:13px;color:var(--t3);margin-top:-8px;margin-bottom:4px">Sam's Club prices — tap any row to update. Saves automatically.</div>
+  <div id="pricing-list"></div>
+</section>
+
 <section id="sec-settings" class="section">
   <span class="section-title">Settings</span>
 
@@ -374,12 +399,16 @@ html,body{height:100%;background:var(--bg);color:var(--t1);
     <svg viewBox="0 0 24 24"><path d="M7 18c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2zM1 2v2h2l3.6 7.59L5.25 14c-.16.28-.25.61-.25.96C5 16.1 5.9 17 7 17h14v-2H7.42c-.14 0-.25-.11-.25-.25l.03-.12.9-1.63H19c.75 0 1.41-.41 1.75-1.03l3.58-6.49A1 1 0 0023.54 4H5.21l-.94-2H1zm16 16c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2z"/></svg>
     <span>Shopping</span>
   </button>
+  <button class="tab" data-sec="sec-pricing" onclick="showSection('sec-pricing')">
+    <svg viewBox="0 0 24 24"><path d="M11.8 10.9c-2.27-.59-3-1.2-3-2.15 0-1.09 1.01-1.85 2.7-1.85 1.78 0 2.44.85 2.5 2.1h2.21c-.07-1.72-1.12-3.3-3.21-3.81V3h-3v2.16c-1.94.42-3.5 1.68-3.5 3.61 0 2.31 1.91 3.46 4.7 4.13 2.5.6 3 1.48 3 2.41 0 .69-.49 1.79-2.7 1.79-2.06 0-2.87-.92-2.98-2.1H6.3c.12 2.19 1.76 3.42 3.7 3.83V21h3v-2.15c1.95-.37 3.5-1.5 3.5-3.55 0-2.84-2.43-3.81-4.7-4.4z"/></svg>
+    <span>Pricing</span>
+  </button>
   <button class="tab" data-sec="sec-settings" onclick="showSection('sec-settings')">
     <svg viewBox="0 0 24 24"><path d="M19.14 12.94c.04-.3.06-.61.06-.94s-.02-.64-.07-.94l2.03-1.58c.18-.14.23-.41.12-.61l-1.92-3.32c-.12-.22-.37-.29-.59-.22l-2.39.96c-.5-.38-1.03-.7-1.62-.94l-.36-2.54c-.04-.24-.24-.41-.48-.41h-3.84c-.24 0-.43.17-.47.41l-.36 2.54c-.59.24-1.13.57-1.62.94l-2.39-.96c-.22-.08-.47 0-.59.22L2.74 8.87c-.12.21-.08.47.12.61l2.03 1.58c-.05.3-.09.63-.09.94s.02.64.07.94l-2.03 1.58c-.18.14-.23.41-.12.61l1.92 3.32c.12.22.37.29.59.22l2.39-.96c.5.38 1.03.7 1.62.94l.36 2.54c.05.24.24.41.48.41h3.84c.24 0 .44-.17.47-.41l.36-2.54c.59-.24 1.13-.56 1.62-.94l2.39.96c.22.08.47 0 .59-.22l1.92-3.32c.12-.22.07-.47-.12-.61l-2.01-1.58zM12 15.6c-1.98 0-3.6-1.62-3.6-3.6s1.62-3.6 3.6-3.6 3.6 1.62 3.6 3.6-1.62 3.6-3.6 3.6z"/></svg>
     <span>Settings</span>
   </button>
 </nav>
-<div id="version-badge">v3.1</div>
+<div id="version-badge">v3.2</div>
 
 <div id="modal-recipe" class="modal hidden">
   <div class="modal-bd" onclick="closeModal('modal-recipe')"></div>
@@ -510,7 +539,8 @@ function rerenderAll(){
 const LS = {
   rot:'mealplan_rotation', muted:'mealplan_muted',
   custom:'mealplan_custom_meals', ins:'mealplan_insertions',
-  shop:'mealplan_shop_checked', pantry:'mealplan_pantry'
+  shop:'mealplan_shop_checked', pantry:'mealplan_pantry',
+  prices:'mealplan_prices'
 };
 function lsGet(k,d){try{const v=localStorage.getItem(k);return v?JSON.parse(v):d}catch{return d}}
 function lsSet(k,v){try{localStorage.setItem(k,JSON.stringify(v))}catch{}supaSet(k,v);}
@@ -1209,6 +1239,153 @@ function downloadRecipePrompt(){
   a.click();
   URL.revokeObjectURL(a.href);
 }
+// ── PRICING ────────────────────────────────────────────────
+const PRICE_GROUPS = [
+  {title:'Proteins', items:[
+    {key:'chicken-thighs', label:'Chicken Thighs (boneless)', unit:'lb', def:3.49},
+    {key:'ground-beef',    label:'Ground Beef 80/20',         unit:'lb', def:4.99},
+    {key:'ground-turkey',  label:'Ground Turkey 93/7',        unit:'lb', def:4.49},
+    {key:'pork-shoulder',  label:'Pork Shoulder',             unit:'lb', def:2.49},
+    {key:'pork-loin',      label:'Pork Loin',                 unit:'lb', def:3.49},
+    {key:'pork-tenderloin',label:'Pork Tenderloin',           unit:'lb', def:4.99},
+    {key:'smoked-sausage', label:'Smoked Sausage',            unit:'lb', def:3.99},
+    {key:'salmon',         label:'Salmon Fillet',             unit:'lb', def:9.99},
+    {key:'shrimp',         label:'Shrimp (large, frozen)',    unit:'lb', def:7.99},
+    {key:'cod',            label:'Cod Fillet',                unit:'lb', def:7.49},
+    {key:'tuna-can',       label:'Tuna (5 oz can)',           unit:'can',def:1.29},
+  ]},
+  {title:'Produce', items:[
+    {key:'potatoes',       label:'Yukon Gold Potatoes',       unit:'lb', def:0.79},
+    {key:'baby-potatoes',  label:'Baby Potatoes',             unit:'lb', def:0.99},
+    {key:'sweet-potatoes', label:'Sweet Potatoes',            unit:'lb', def:0.99},
+    {key:'broccoli',       label:'Broccoli',                  unit:'lb', def:1.29},
+    {key:'green-beans',    label:'Green Beans',               unit:'lb', def:1.99},
+    {key:'asparagus',      label:'Asparagus',                 unit:'lb', def:2.49},
+    {key:'baby-spinach',   label:'Baby Spinach',              unit:'lb', def:3.99},
+  ]},
+  {title:'Canned & Broth', items:[
+    {key:'black-beans-can',label:'Black Beans (15 oz)',       unit:'can',def:0.99},
+    {key:'white-beans-can',label:'White Beans (15 oz)',       unit:'can',def:0.99},
+    {key:'chicken-broth',  label:'Chicken Broth (32 oz)',     unit:'carton',def:2.49},
+    {key:'beef-broth',     label:'Beef Broth (32 oz)',        unit:'carton',def:2.49},
+    {key:'pasta-sauce',    label:'Pasta Sauce (24 oz)',       unit:'jar', def:3.49},
+  ]},
+  {title:'Grains & Pasta', items:[
+    {key:'brown-rice',     label:'Brown Rice',                unit:'lb', def:0.89},
+    {key:'white-rice',     label:'White Rice',                unit:'lb', def:0.79},
+    {key:'pasta',          label:'Pasta (spaghetti/penne)',   unit:'lb', def:1.49},
+    {key:'egg-noodles',    label:'Egg Noodles',               unit:'lb', def:1.99},
+    {key:'tortellini',     label:'Tortellini (frozen)',       unit:'lb', def:3.99},
+    {key:'ravioli',        label:'Ravioli (frozen)',          unit:'lb', def:3.49},
+    {key:'bowtie-pasta',   label:'Bowtie Pasta',             unit:'lb', def:1.49},
+  ]},
+  {title:'Dairy', items:[
+    {key:'cheddar',        label:'Shredded Cheddar',          unit:'lb', def:5.49},
+    {key:'mexican-blend',  label:'Mexican Cheese Blend',      unit:'lb', def:5.49},
+    {key:'parmesan',       label:'Parmesan (grated)',         unit:'lb', def:6.99},
+    {key:'mozzarella',     label:'Mozzarella (shredded)',     unit:'lb', def:5.49},
+    {key:'sour-cream',     label:'Sour Cream',                unit:'lb', def:2.99},
+    {key:'eggs',           label:'Eggs',                      unit:'dozen',def:4.99},
+    {key:'butter',         label:'Butter',                    unit:'lb', def:4.99},
+    {key:'cream-cheese',   label:'Cream Cheese',              unit:'lb', def:4.49},
+    {key:'heavy-cream',    label:'Heavy Cream',               unit:'pint',def:3.99},
+    {key:'ricotta',        label:'Ricotta (fat-free)',        unit:'lb', def:3.49},
+  ]},
+];
+
+function getPrices(){return lsGet('mealplan_prices',{});}
+function getPrice(key,def){const p=getPrices();return p[key]!==undefined?p[key]:def;}
+function setPrice(key,val){const p=getPrices();p[key]=val;lsSet('mealplan_prices',p);}
+
+let _priceEditKey=null;
+function renderPricing(){
+  const el=document.getElementById('pricing-list');
+  if(!el)return;
+  el.innerHTML='';
+  PRICE_GROUPS.forEach(group=>{
+    const hdr=document.createElement('div');
+    hdr.className='price-group-title';
+    hdr.textContent=group.title;
+    el.appendChild(hdr);
+    const grp=document.createElement('div');
+    grp.className='price-group';
+    group.items.forEach((item,idx)=>{
+      const row=document.createElement('div');
+      row.className='price-row';
+      row.dataset.key=item.key;
+      // first/last/only radius via CSS :first-of-type etc won't work on div, so set manually
+      const total=group.items.length;
+      if(total===1)row.style.borderRadius='14px';
+      else if(idx===0)row.style.borderRadius='14px 14px 0 0';
+      else if(idx===total-1)row.style.borderRadius='0 0 14px 14px';
+      const price=getPrice(item.key,item.def);
+      const isCustom=getPrices()[item.key]!==undefined;
+      row.innerHTML=`
+        <span class="price-label">${item.label}</span>
+        <span class="price-unit">/${item.unit}</span>
+        <span class="price-val${isCustom?'':' default'}" data-key="${item.key}">$${price.toFixed(2)}</span>`;
+      row.addEventListener('click',()=>openPriceEdit(row,item));
+      grp.appendChild(row);
+    });
+    el.appendChild(grp);
+  });
+}
+
+function openPriceEdit(row,item){
+  // If another row is already open, close it first
+  if(_priceEditKey&&_priceEditKey!==item.key){
+    const open=document.querySelector(`.price-row[data-key="${_priceEditKey}"]`);
+    if(open)closePriceEdit(open,_findItem(_priceEditKey));
+  }
+  _priceEditKey=item.key;
+  const price=getPrice(item.key,item.def);
+  const valEl=row.querySelector('.price-val');
+  valEl.style.display='none';
+  const unitEl=row.querySelector('.price-unit');
+  unitEl.style.display='none';
+  const wrap=document.createElement('div');
+  wrap.className='price-input-wrap';
+  wrap.innerHTML=`<span style="color:var(--t2);font-size:15px">$</span>
+    <input class="price-input" type="number" step="0.01" min="0" value="${price.toFixed(2)}" inputmode="decimal">
+    <span class="price-reset" data-key="${item.key}">reset</span>`;
+  row.appendChild(wrap);
+  const input=wrap.querySelector('.price-input');
+  const resetBtn=wrap.querySelector('.price-reset');
+  input.focus();
+  input.select();
+  const save=()=>{
+    const v=parseFloat(input.value);
+    if(!isNaN(v)&&v>=0)setPrice(item.key,Math.round(v*100)/100);
+    closePriceEdit(row,item);
+    _priceEditKey=null;
+  };
+  input.addEventListener('blur',save);
+  input.addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();input.blur();}});
+  resetBtn.addEventListener('mousedown',e=>{
+    e.preventDefault();
+    const p=getPrices();delete p[item.key];lsSet('mealplan_prices',p);
+    closePriceEdit(row,item);
+    _priceEditKey=null;
+  });
+}
+
+function closePriceEdit(row,item){
+  const wrap=row.querySelector('.price-input-wrap');
+  if(wrap)wrap.remove();
+  const price=getPrice(item.key,item.def);
+  const isCustom=getPrices()[item.key]!==undefined;
+  const valEl=row.querySelector('.price-val');
+  if(valEl){valEl.textContent=`$${price.toFixed(2)}`;valEl.style.display='';
+    valEl.className=`price-val${isCustom?'':' default'}`;}
+  const unitEl=row.querySelector('.price-unit');
+  if(unitEl)unitEl.style.display='';
+}
+
+function _findItem(key){
+  for(const g of PRICE_GROUPS)for(const it of g.items)if(it.key===key)return it;
+  return null;
+}
+
 function clearAllPantry(){
   if(!confirm('Clear all pantry quantities?'))return;
   lsSet(LS.pantry,{});
@@ -1575,6 +1752,7 @@ function showSection(secId){
   if(secId==='sec-shopping'){initShoppingPeriods();renderShopTabs();renderShopToggle();renderShopItems()}
   if(secId==='sec-calendar')renderCalendar();
   if(secId==='sec-meals')renderMeals();
+  if(secId==='sec-pricing')renderPricing();
 }
 
 // ── INIT ───────────────────────────────────────────────────
