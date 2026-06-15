@@ -324,7 +324,7 @@ html,body{height:100%;background:var(--bg);color:var(--t1);
     <span>Shopping</span>
   </button>
 </nav>
-<div id="version-badge">v2.2</div>
+<div id="version-badge">v2.3</div>
 
 <div id="modal-recipe" class="modal hidden">
   <div class="modal-bd" onclick="closeModal('modal-recipe')"></div>
@@ -655,50 +655,133 @@ function initCalStart(){
   setupCalSwipe();
 }
 let _calSwiping=false; // true if finger moved enough to be a swipe, not a tap
+let _calClone=null,_calDragDir=0;
 function setupCalSwipe(){
   const sec=document.getElementById('sec-calendar');
-  let sx=0,sy=0,moved=false,active=false;
+  let sx=0,sy=0,active=false,dirLocked=false;
   sec.addEventListener('touchstart',e=>{
-    if(e.target.closest('button'))return; // let arrow buttons work normally
+    if(e.target.closest('button'))return;
+    if(_calClone)return; // mid-animation, ignore
     sx=e.touches[0].clientX;sy=e.touches[0].clientY;
-    moved=false;active=true;_calSwiping=false;
-    const cards=document.getElementById('cal-cards');
-    cards.style.transition='none';
+    active=true;dirLocked=false;_calSwiping=false;_calDragDir=0;
   },{passive:true});
   sec.addEventListener('touchmove',e=>{
     if(!active)return;
     const dx=e.touches[0].clientX-sx;
     const dy=e.touches[0].clientY-sy;
-    // Only track if more vertical than horizontal (not a horizontal scroll attempt)
-    if(!moved&&Math.abs(dx)>Math.abs(dy)+4){active=false;return;}
-    moved=true;_calSwiping=Math.abs(dy)>8;
-    const cards=document.getElementById('cal-cards');
-    // Rubber-band: full drag near start, resistance as it extends
-    const pull=dy*(Math.abs(dy)<60?0.55:0.3);
-    cards.style.transform=`translateY(${pull}px)`;
-  },{passive:true});
-  sec.addEventListener('touchend',e=>{
-    if(!active)return;active=false;
-    const cards=document.getElementById('cal-cards');
-    const dy=e.changedTouches[0].clientY-sy;
-    if(Math.abs(dy)>52){
-      calNav(dy<0?1:-1,dy<0?-1:1);
-    } else {
-      // Spring back
-      cards.style.transition='transform 0.35s var(--spring)';
-      cards.style.transform='translateY(0)';
-      setTimeout(()=>cards.style.transition='',350);
-      _calSwiping=false;
+    if(!dirLocked){
+      if(Math.abs(dy)<6)return;
+      if(Math.abs(dx)>Math.abs(dy)){active=false;return;} // horizontal — ignore
+      dirLocked=true;
+      _calDragDir=dy<0?1:-1; // up=next week, down=prev week
+      _calSwiping=true;
+      // Spawn clone of adjacent week
+      const cards=document.getElementById('cal-cards');
+      const h=cards.offsetHeight;
+      cards.style.transition='none';
+      _calClone=document.createElement('div');
+      _calClone.style.cssText=`position:absolute;inset:0;display:flex;flex-direction:column;gap:8px;`;
+      buildCalWeek(_calClone,_calDragDir);
+      _calClone.style.transform=`translateY(${_calDragDir>0?h:-h}px)`;
+      _calClone.style.transition='none';
+      const wrap=cards.parentElement;
+      wrap.style.position='relative';
+      wrap.style.overflow='hidden';
+      wrap.style.flex='1';
+      wrap.style.display='flex';
+      wrap.style.flexDirection='column';
+      cards.style.position='absolute';cards.style.inset='0';
+      wrap.appendChild(_calClone);
     }
+    const cards=document.getElementById('cal-cards');
+    const h=cards.offsetHeight;
+    const raw=dy;
+    // Resist if dragging opposite to locked direction
+    const pull=Math.sign(raw)===_calDragDir*-1?raw:raw;
+    cards.style.transform=`translateY(${pull}px)`;
+    _calClone.style.transform=`translateY(${pull+(_calDragDir>0?h:-h)}px)`;
   },{passive:true});
+  const finish=e=>{
+    if(!active)return;active=false;
+    if(!dirLocked){_calSwiping=false;return;}
+    const dy=e.changedTouches[0].clientY-sy;
+    const cards=document.getElementById('cal-cards');
+    const h=cards.offsetHeight;
+    const commit=Math.abs(dy)>h*0.25&&Math.sign(dy)!==_calDragDir;
+    const sp='transform 0.36s var(--spring)';
+    if(commit){
+      // Snap to next/prev week
+      const exitY=_calDragDir>0?-h:h;
+      cards.style.transition=sp;cards.style.transform=`translateY(${exitY}px)`;
+      _calClone.style.transition=sp;_calClone.style.transform='translateY(0)';
+      const dir=_calDragDir,clone=_calClone;
+      setTimeout(()=>{
+        calStart=new Date(calStart);calStart.setDate(calStart.getDate()+dir*7);
+        clone.remove();_calClone=null;
+        renderCalendar();
+        // restore cards layout
+        const c=document.getElementById('cal-cards');
+        c.style.position='';c.style.inset='';
+        _calDragDir=0;_calSwiping=false;
+      },360);
+    } else {
+      // Snap back
+      cards.style.transition=sp;cards.style.transform='translateY(0)';
+      const h2=cards.offsetHeight,dir=_calDragDir,clone=_calClone;
+      clone.style.transition=sp;clone.style.transform=`translateY(${dir>0?h2:-h2}px)`;
+      setTimeout(()=>{
+        clone.remove();if(_calClone===clone)_calClone=null;
+        cards.style.position='';cards.style.inset='';
+        _calDragDir=0;_calSwiping=false;
+      },360);
+    }
+  };
+  sec.addEventListener('touchend',finish,{passive:true});
+  sec.addEventListener('touchcancel',finish,{passive:true});
 }
-function calNav(dir,dragOffset){
+function buildCalWeek(container,relDir){
+  // Render a week offset from calStart into an existing container element
+  const tempStart=new Date(calStart);tempStart.setDate(tempStart.getDate()+relDir*7);
+  const today=d0(new Date());
+  const days=Array.from({length:7},(_,i)=>{const d=new Date(tempStart);d.setDate(d.getDate()+i);return d});
+  const ABBR=['SUN','MON','TUE','WED','THU','FRI','SAT'];
+  days.forEach((day,i)=>{
+    const info=getMealForDate(day);
+    const meal=info?.id?getAllMeals()[info.id]:null;
+    const isTod=sameDay(day,today);
+    const isBulk=isBulkSunday(day);
+    const isSun=day.getDay()===0;
+    const method=meal?.method||'';
+    const dotCls=method?`dot-${method}`:'dot-none';
+    const card=document.createElement('div');
+    card.className=`day-card${isTod?' is-today':''}`;
+    card.style.flex='1';
+    const badges=[];
+    if(isBulk)badges.push('<span class="badge badge-sams">SAM\'S</span>');
+    else if(isSun)badges.push('<span class="badge badge-shop">SHOP</span>');
+    const mealName=meal?meal.name:'—';
+    const subtitle=meal?`${meal.method.charAt(0).toUpperCase()+meal.method.slice(1)} · ${meal.prepTime+meal.cookTime} min`:'';
+    card.innerHTML=`
+      <div class="day-dot ${dotCls}"></div>
+      <div class="day-date">
+        <span class="day-abbr">${ABBR[day.getDay()]}</span>
+        <span class="day-num">${day.getDate()}</span>
+      </div>
+      <div class="day-info">
+        <div class="day-meal">${mealName}</div>
+        ${subtitle?`<div class="day-sub">${subtitle}</div>`:''}
+      </div>
+      <div class="day-badges">${badges.join('')}</div>`;
+    container.appendChild(card);
+  });
+}
+function calNav(dir){
+  // Arrow button navigation — simple slide
+  if(_calClone)return;
   const cards=document.getElementById('cal-cards');
   const h=cards.offsetHeight;
-  const exitY=dir<0?-h:h; // swipe up → exit up, swipe down → exit down
-  const enterY=dir<0?h:-h;
-  // If user already dragged partway, start from current position
-  const startY=dragOffset??0;
+  const exitY=dir>0?-h:h;
+  const enterY=dir>0?h:-h;
   cards.style.transition='transform 0.3s var(--ease-out)';
   cards.style.transform=`translateY(${exitY}px)`;
   setTimeout(()=>{
