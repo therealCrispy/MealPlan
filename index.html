@@ -54,7 +54,7 @@ html,body{height:100%;background:var(--bg);color:var(--t1);
 .section{display:none;flex:1;overflow-y:auto;
   padding:calc(env(safe-area-inset-top,44px) + 16px) 16px calc(var(--tab) + env(safe-area-inset-bottom,0px) + 20px);
   -webkit-overflow-scrolling:touch;gap:10px;flex-direction:column}
-#sec-calendar{overflow:hidden;display:flex;flex-direction:column}
+#sec-calendar{overflow:hidden}
 .section.active{display:flex;animation:sectionIn 0.28s var(--ease-out) both}
 @keyframes sectionIn{from{opacity:0;transform:translateY(5px)}to{opacity:1;transform:translateY(0)}}
 
@@ -324,7 +324,7 @@ html,body{height:100%;background:var(--bg);color:var(--t1);
     <span>Shopping</span>
   </button>
 </nav>
-<div id="version-badge">v2.0</div>
+<div id="version-badge">v2.1</div>
 
 <div id="modal-recipe" class="modal hidden">
   <div class="modal-bd" onclick="closeModal('modal-recipe')"></div>
