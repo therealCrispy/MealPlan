@@ -306,7 +306,7 @@ html,body{height:100%;background:var(--bg);color:var(--t1);
     <span>Shopping</span>
   </button>
 </nav>
-<div id="version-badge">v1.4</div>
+<div id="version-badge">v1.5</div>
 
 <div id="modal-recipe" class="modal hidden">
   <div class="modal-bd" onclick="closeModal('modal-recipe')"></div>
@@ -1189,11 +1189,13 @@ function setupSwipeToDismiss(modal){
     dragging=false;
     const dy=lastY-startY;
     if(dy>110||vel>0.45){
+      modal.style.pointerEvents='none';
       sheet.style.transition='transform 0.36s cubic-bezier(0.32,0.72,0,1)';
       sheet.style.transform='translateY(110%)';
       setTimeout(()=>{
         sheet.style.transform='';
         sheet.style.transition='';
+        modal.style.pointerEvents='';
         closeModal(modal.id);
       },360);
     } else {
