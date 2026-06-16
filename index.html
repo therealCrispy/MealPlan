@@ -622,10 +622,14 @@ function getMealsForWeek(mon){
       break;
     }
   }
-  // Step 4: 14-day no-repeat (skip the prepped weekday slot)
+  // Step 4: 14-day no-repeat + within-week no-repeat (skip the prepped weekday slot)
   for(let i=0;i<7;i++){
     if(!ids[i]||i===preppedIdx)continue;
     const used=new Set();
+    // Exclude recipes already assigned elsewhere this week (replacements picked for
+    // earlier days propagate forward, preventing a second collision)
+    for(let j=0;j<7;j++){if(j!==i&&ids[j])used.add(ids[j]);}
+    // Exclude recipes seen in the last 14 days
     for(let b=1;b<=13;b++){
       const prev=new Date(days[i]);prev.setDate(prev.getDate()-b);
       const diff=Math.round((d0(prev)-start)/86400000);
