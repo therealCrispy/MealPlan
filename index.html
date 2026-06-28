@@ -384,12 +384,8 @@ html,body{height:100%;background:var(--bg);color:var(--t1);
 
   <div class="settings-card">
     <div class="settings-card-title">Rotation</div>
-    <div class="settings-card-desc">Sam's Club bulk shop every 14 days starting June 21, 2026.</div>
-    <div style="display:flex;align-items:center;gap:10px;margin-top:4px">
-      <label style="font-size:13px;color:var(--t2);white-space:nowrap">Start date</label>
-      <input type="date" id="rot-start-input" style="flex:1;background:var(--s2);color:var(--t1);border:1px solid var(--s3);border-radius:8px;padding:6px 10px;font-size:14px;-webkit-appearance:none"
-        onchange="setRotationStart(this.value)">
-    </div>
+    <div class="settings-card-desc" id="rot-start-desc">Meal rotation starts —</div>
+    <button class="settings-btn" onclick="openRotStartModal()">Reset Start Date</button>
   </div>
 </section>
 
@@ -417,7 +413,7 @@ html,body{height:100%;background:var(--bg);color:var(--t1);
     <span>Settings</span>
   </button>
 </nav>
-<div id="version-badge">v3.6</div>
+<div id="version-badge">v3.7</div>
 
 <div id="modal-recipe" class="modal hidden">
   <div class="modal-bd" onclick="closeModal('modal-recipe')"></div>
@@ -426,6 +422,17 @@ html,body{height:100%;background:var(--bg);color:var(--t1);
     <button class="modal-close" onclick="closeModal('modal-recipe')">&#10005;</button>
     <div class="modal-body">
       <div id="modal-recipe-body"></div>
+    </div>
+  </div>
+</div>
+
+<div id="modal-rot-start" class="modal hidden">
+  <div class="modal-bd" onclick="closeModal('modal-rot-start')"></div>
+  <div class="modal-sheet">
+    <div class="modal-handle"><div class="modal-pill"></div></div>
+    <button class="modal-close" onclick="closeModal('modal-rot-start')">&#10005;</button>
+    <div class="modal-body">
+      <div id="modal-rot-start-body"></div>
     </div>
   </div>
 </div>
@@ -1504,9 +1511,74 @@ function updateCartTotal(groups,pantry){
   bar.style.display='flex';
 }
 
+let _rotCalMonth=new Date(),_rotPickedDate=null;
+function openRotStartModal(){
+  _rotCalMonth=new Date();_rotCalMonth.setDate(1);
+  _rotPickedDate=null;
+  renderRotStartModal();
+  openModal('modal-rot-start');
+}
+function rotCalNav(dir){
+  _rotCalMonth=new Date(_rotCalMonth);_rotCalMonth.setMonth(_rotCalMonth.getMonth()+dir);
+  renderRotStartModal();
+}
+function pickRotStartDate(y,m,d){
+  _rotPickedDate=new Date(y,m,d);
+  renderRotStartModal();
+}
+function renderRotStartModal(){
+  const body=document.getElementById('modal-rot-start-body');
+  const earliest=new Date(2020,0,1);
+  body.innerHTML=`
+    <h2 class="rm-title">Reset Rotation Start</h2>
+    <p class="step-hint">Pick the Monday the new rotation begins</p>
+    <div class="mini-cal">
+      <div class="mini-cal-hdr">
+        <button class="mini-nav" onclick="rotCalNav(-1)">&#8249;</button>
+        <span class="mini-cal-title">${fmtMon(_rotCalMonth)}</span>
+        <button class="mini-nav" onclick="rotCalNav(1)">&#8250;</button>
+      </div>
+      <div class="mini-grid">${renderMiniCalRot(_rotCalMonth,earliest,_rotPickedDate)}</div>
+    </div>
+    ${_rotPickedDate?`<button class="save-btn" style="margin-top:16px" onclick="confirmRotStart()">Reset to ${fmtShort(_rotPickedDate)}</button>`:''}
+  `;
+}
+function renderMiniCalRot(monthDate,earliest,picked){
+  const yr=monthDate.getFullYear(),mo=monthDate.getMonth();
+  const first=new Date(yr,mo,1),last=new Date(yr,mo+1,0);
+  const startDow=(first.getDay()+6)%7;
+  const DOWS=['Mo','Tu','We','Th','Fr','Sa','Su'];
+  let html=DOWS.map(d=>`<div class="mini-dow">${d}</div>`).join('');
+  for(let i=0;i<startDow;i++)html+=`<div class="mini-day empty"></div>`;
+  for(let d=1;d<=last.getDate();d++){
+    const dt=new Date(yr,mo,d);
+    const disabled=d0(dt)<d0(earliest);
+    const sel=picked&&sameDay(dt,picked);
+    html+=`<div class="mini-day${disabled?' disabled':''}${sel?' selected':''}" ${disabled?'':` onclick="pickRotStartDate(${yr},${mo},${d})"`}>${d}</div>`;
+  }
+  return html;
+}
+function confirmRotStart(){
+  if(!_rotPickedDate)return;
+  const d=_rotPickedDate;
+  const val=`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+  localStorage.setItem('mealplan_rot_start',val);
+  updateRotStartDesc();
+  renderCalendar();
+  initShoppingPeriods();
+  renderShopTabs();
+  renderShopToggle();
+  renderShopItems();
+  closeModal('modal-rot-start');
+}
+function updateRotStartDesc(){
+  const el=document.getElementById('rot-start-desc');
+  if(el)el.textContent=`Meal rotation starts ${fmtShort(getRotationStart())}. Sam's Club every 14 days from the day before.`;
+}
 function setRotationStart(val){
   if(!val)return;
   localStorage.setItem('mealplan_rot_start',val);
+  updateRotStartDesc();
   renderCalendar();
   initShoppingPeriods();
   renderShopTabs();
@@ -1896,7 +1968,7 @@ async function init(){
   await syncFromSupabase();
   initStorage();
   initCalStart();
-  initRotStartInput();
+  updateRotStartDesc();
   renderCalendar();
   renderMeals();
   initShoppingPeriods();
