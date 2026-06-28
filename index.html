@@ -413,7 +413,7 @@ html,body{height:100%;background:var(--bg);color:var(--t1);
     <span>Settings</span>
   </button>
 </nav>
-<div id="version-badge">v3.7</div>
+<div id="version-badge">v3.8</div>
 
 <div id="modal-recipe" class="modal hidden">
   <div class="modal-bd" onclick="closeModal('modal-recipe')"></div>
@@ -450,14 +450,14 @@ html,body{height:100%;background:var(--bg);color:var(--t1);
 
 <script>
 // ── CONSTANTS ──────────────────────────────────────────────
-const DEFAULT_ROTATION_START = new Date(2026,5,22);
-function getRotationStart(){
+// mealplan_rot_start stores the first bulk SUNDAY (e.g. Jun 21 2026)
+// The meal rotation starts the next day (Monday)
+function getFirstBulkSunday(){
   const s=localStorage.getItem('mealplan_rot_start');
   if(s){const d=new Date(s+'T00:00:00');if(!isNaN(d))return d;}
-  return DEFAULT_ROTATION_START;
+  return new Date(2026,5,21); // default: Jun 21 2026
 }
-// Bulk shopping Sunday is always the day before the rotation Monday
-function getFirstBulkSunday(){const d=new Date(getRotationStart());d.setDate(d.getDate()-1);return d;}
+function getRotationStart(){const d=new Date(getFirstBulkSunday());d.setDate(d.getDate()+1);return d;}
 const BULK_INTERVAL = 14;
 
 // ── MEALS DATA ─────────────────────────────────────────────
@@ -1528,22 +1528,21 @@ function pickRotStartDate(y,m,d){
 }
 function renderRotStartModal(){
   const body=document.getElementById('modal-rot-start-body');
-  const earliest=new Date(2020,0,1);
   body.innerHTML=`
     <h2 class="rm-title">Reset Rotation Start</h2>
-    <p class="step-hint">Pick the Monday the new rotation begins</p>
+    <p class="step-hint">Pick the Sunday to start shopping &amp; rotation</p>
     <div class="mini-cal">
       <div class="mini-cal-hdr">
         <button class="mini-nav" onclick="rotCalNav(-1)">&#8249;</button>
         <span class="mini-cal-title">${fmtMon(_rotCalMonth)}</span>
         <button class="mini-nav" onclick="rotCalNav(1)">&#8250;</button>
       </div>
-      <div class="mini-grid">${renderMiniCalRot(_rotCalMonth,earliest,_rotPickedDate)}</div>
+      <div class="mini-grid">${renderMiniCalRot(_rotCalMonth,_rotPickedDate)}</div>
     </div>
     ${_rotPickedDate?`<button class="save-btn" style="margin-top:16px" onclick="confirmRotStart()">Reset to ${fmtShort(_rotPickedDate)}</button>`:''}
   `;
 }
-function renderMiniCalRot(monthDate,earliest,picked){
+function renderMiniCalRot(monthDate,picked){
   const yr=monthDate.getFullYear(),mo=monthDate.getMonth();
   const first=new Date(yr,mo,1),last=new Date(yr,mo+1,0);
   const startDow=(first.getDay()+6)%7;
@@ -1552,9 +1551,10 @@ function renderMiniCalRot(monthDate,earliest,picked){
   for(let i=0;i<startDow;i++)html+=`<div class="mini-day empty"></div>`;
   for(let d=1;d<=last.getDate();d++){
     const dt=new Date(yr,mo,d);
-    const disabled=d0(dt)<d0(earliest);
+    const isSun=dt.getDay()===0;
     const sel=picked&&sameDay(dt,picked);
-    html+=`<div class="mini-day${disabled?' disabled':''}${sel?' selected':''}" ${disabled?'':` onclick="pickRotStartDate(${yr},${mo},${d})"`}>${d}</div>`;
+    // only Sundays are selectable
+    html+=`<div class="mini-day${!isSun?' disabled':''}${sel?' selected':''}" ${isSun?` onclick="pickRotStartDate(${yr},${mo},${d})"`:''} style="${!isSun?'opacity:.25':''}">${d}</div>`;
   }
   return html;
 }
