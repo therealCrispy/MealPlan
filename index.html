@@ -413,7 +413,7 @@ html,body{height:100%;background:var(--bg);color:var(--t1);
     <span>Settings</span>
   </button>
 </nav>
-<div id="version-badge">v3.8</div>
+<div id="version-badge">v3.9</div>
 
 <div id="modal-recipe" class="modal hidden">
   <div class="modal-bd" onclick="closeModal('modal-recipe')"></div>
@@ -453,8 +453,8 @@ html,body{height:100%;background:var(--bg);color:var(--t1);
 // mealplan_rot_start stores the first bulk SUNDAY (e.g. Jun 21 2026)
 // The meal rotation starts the next day (Monday)
 function getFirstBulkSunday(){
-  const s=localStorage.getItem('mealplan_rot_start');
-  if(s){const d=new Date(s+'T00:00:00');if(!isNaN(d))return d;}
+  const s=localStorage.getItem(LS.rotStart);
+  if(s){const v=typeof s==='string'&&s[0]==='"'?JSON.parse(s):s;const d=new Date(v+'T00:00:00');if(!isNaN(d))return d;}
   return new Date(2026,5,21); // default: Jun 21 2026
 }
 function getRotationStart(){const d=new Date(getFirstBulkSunday());d.setDate(d.getDate()+1);return d;}
@@ -562,7 +562,7 @@ const LS = {
   rot:'mealplan_rotation', muted:'mealplan_muted',
   custom:'mealplan_custom_meals', ins:'mealplan_insertions',
   shop:'mealplan_shop_checked', pantry:'mealplan_pantry',
-  prices:'mealplan_prices'
+  prices:'mealplan_prices', rotStart:'mealplan_rot_start'
 };
 function lsGet(k,d){try{const v=localStorage.getItem(k);return v?JSON.parse(v):d}catch{return d}}
 function lsSet(k,v){try{localStorage.setItem(k,JSON.stringify(v))}catch{}supaSet(k,v);}
@@ -1562,7 +1562,7 @@ function confirmRotStart(){
   if(!_rotPickedDate)return;
   const d=_rotPickedDate;
   const val=`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
-  localStorage.setItem('mealplan_rot_start',val);
+  lsSet(LS.rotStart,val);
   updateRotStartDesc();
   renderCalendar();
   initShoppingPeriods();
@@ -1577,7 +1577,7 @@ function updateRotStartDesc(){
 }
 function setRotationStart(val){
   if(!val)return;
-  localStorage.setItem('mealplan_rot_start',val);
+  lsSet(LS.rotStart,val);
   updateRotStartDesc();
   renderCalendar();
   initShoppingPeriods();
