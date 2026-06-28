@@ -384,7 +384,12 @@ html,body{height:100%;background:var(--bg);color:var(--t1);
 
   <div class="settings-card">
     <div class="settings-card-title">Rotation</div>
-    <div class="settings-card-desc">Meal rotation starts June 22, 2026. Sam's Club bulk shop every 14 days starting June 21, 2026.</div>
+    <div class="settings-card-desc">Sam's Club bulk shop every 14 days starting June 21, 2026.</div>
+    <div style="display:flex;align-items:center;gap:10px;margin-top:4px">
+      <label style="font-size:13px;color:var(--t2);white-space:nowrap">Start date</label>
+      <input type="date" id="rot-start-input" style="flex:1;background:var(--s2);color:var(--t1);border:1px solid var(--s3);border-radius:8px;padding:6px 10px;font-size:14px;-webkit-appearance:none"
+        onchange="setRotationStart(this.value)">
+    </div>
   </div>
 </section>
 
@@ -412,7 +417,7 @@ html,body{height:100%;background:var(--bg);color:var(--t1);
     <span>Settings</span>
   </button>
 </nav>
-<div id="version-badge">v3.4</div>
+<div id="version-badge">v3.5</div>
 
 <div id="modal-recipe" class="modal hidden">
   <div class="modal-bd" onclick="closeModal('modal-recipe')"></div>
@@ -438,8 +443,13 @@ html,body{height:100%;background:var(--bg);color:var(--t1);
 
 <script>
 // ── CONSTANTS ──────────────────────────────────────────────
-const ROTATION_START = new Date(2026,5,22);
+const DEFAULT_ROTATION_START = new Date(2026,5,22);
 const FIRST_BULK_SUNDAY = new Date(2026,5,21);
+function getRotationStart(){
+  const s=localStorage.getItem('mealplan_rot_start');
+  if(s){const d=new Date(s+'T00:00:00');if(!isNaN(d))return d;}
+  return DEFAULT_ROTATION_START;
+}
 const BULK_INTERVAL = 14;
 
 // ── MEALS DATA ─────────────────────────────────────────────
@@ -594,7 +604,7 @@ function getEarliestAddDate(){const ns=getNextBulkSunday();ns.setDate(ns.getDate
 const DAY_NAMES=['Monday','Tuesday','Wednesday','Thursday','Friday','Saturday','Sunday'];
 function getMealsForWeek(mon){
   const rot=getActiveRot(),allM=getAllMeals();
-  const start=d0(ROTATION_START),ws=d0(mon);
+  const start=d0(getRotationStart()),ws=d0(mon);
   const days=Array.from({length:7},(_,i)=>{const d=new Date(ws);d.setDate(d.getDate()+i);return d});
   // Step 1: base rotation
   let ids=days.map(d=>{
@@ -1493,6 +1503,19 @@ function updateCartTotal(groups,pantry){
   bar.style.display='flex';
 }
 
+function setRotationStart(val){
+  if(!val)return;
+  localStorage.setItem('mealplan_rot_start',val);
+  renderCalendar();
+}
+function initRotStartInput(){
+  const inp=document.getElementById('rot-start-input');
+  if(!inp)return;
+  const d=getRotationStart();
+  const y=d.getFullYear(),m=String(d.getMonth()+1).padStart(2,'0'),day=String(d.getDate()).padStart(2,'0');
+  inp.value=`${y}-${m}-${day}`;
+}
+
 function clearAllPantry(){
   if(!confirm('Clear all pantry quantities?'))return;
   lsSet(LS.pantry,{});
@@ -1868,6 +1891,7 @@ async function init(){
   await syncFromSupabase();
   initStorage();
   initCalStart();
+  initRotStartInput();
   renderCalendar();
   renderMeals();
   initShoppingPeriods();
