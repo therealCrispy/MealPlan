@@ -417,7 +417,7 @@ html,body{height:100%;background:var(--bg);color:var(--t1);
     <span>Settings</span>
   </button>
 </nav>
-<div id="version-badge">v3.5</div>
+<div id="version-badge">v3.6</div>
 
 <div id="modal-recipe" class="modal hidden">
   <div class="modal-bd" onclick="closeModal('modal-recipe')"></div>
@@ -444,12 +444,14 @@ html,body{height:100%;background:var(--bg);color:var(--t1);
 <script>
 // ── CONSTANTS ──────────────────────────────────────────────
 const DEFAULT_ROTATION_START = new Date(2026,5,22);
-const FIRST_BULK_SUNDAY = new Date(2026,5,21);
 function getRotationStart(){
   const s=localStorage.getItem('mealplan_rot_start');
   if(s){const d=new Date(s+'T00:00:00');if(!isNaN(d))return d;}
   return DEFAULT_ROTATION_START;
 }
+// Bulk shopping Sunday is always the day before the rotation Monday
+function getFirstBulkSunday(){const d=new Date(getRotationStart());d.setDate(d.getDate()-1);return d;}
+const BULK_INTERVAL = 14;
 const BULK_INTERVAL = 14;
 
 // ── MEALS DATA ─────────────────────────────────────────────
@@ -587,11 +589,11 @@ function fmtMon(d){return d0(d).toLocaleDateString('en-US',{month:'short',year:'
 
 // ── SCHEDULING ─────────────────────────────────────────────
 function isBulkSunday(d){
-  const diff=Math.round((d0(d)-d0(FIRST_BULK_SUNDAY))/86400000);
+  const diff=Math.round((d0(d)-d0(getFirstBulkSunday()))/86400000);
   return diff>=0&&diff%BULK_INTERVAL===0;
 }
 function getUpcomingBulkSundays(n=3){
-  const today=d0(new Date()),first=d0(FIRST_BULK_SUNDAY),res=[];
+  const today=d0(new Date()),first=d0(getFirstBulkSunday()),res=[];
   const elapsed=Math.max(0,Math.floor(Math.round((today-first)/86400000)/BULK_INTERVAL));
   let cur=new Date(first);cur.setDate(cur.getDate()+elapsed*BULK_INTERVAL);
   if(cur<today)cur.setDate(cur.getDate()+BULK_INTERVAL);
@@ -1507,6 +1509,10 @@ function setRotationStart(val){
   if(!val)return;
   localStorage.setItem('mealplan_rot_start',val);
   renderCalendar();
+  initShoppingPeriods();
+  renderShopTabs();
+  renderShopToggle();
+  renderShopItems();
 }
 function initRotStartInput(){
   const inp=document.getElementById('rot-start-input');
