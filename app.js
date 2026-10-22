@@ -9,10 +9,11 @@ let state=read(KEY,null)||migrate();state.recipePrices ||= {};state.purchases ||
 let sync=read(META,{enabled:false,base:null,pending:false}),tab='plan',week=0,shopDay='',store='sams',query='',busy=false;
 const all=()=>({...MEALS,...state.custom});
 const startCycle=(d=today())=>E.add(state.anchor,Math.floor(E.diff(d,state.anchor)/14)*14+1);
+const weekStart=(d=today())=>E.add(d,-((E.date(d).getDay()+6)%7));
 const nextSunday=(d=today())=>E.add(d,(7-E.date(d).getDay())%7);
 const bulk=d=>((E.diff(d,state.anchor)%14)+14)%14===0;
 function persist(){try{localStorage.setItem(KEY,JSON.stringify(state));sync.pending=true;localStorage.setItem(META,JSON.stringify(sync));status();if(sync.enabled)setTimeout(syncNow,400);}catch(e){toast('Could not save: device storage is full. Export a backup now.');throw e;}}
-function status(msg){$('#sync-status').textContent=msg||(sync.enabled?(sync.pending?'Changes waiting to sync':'Synced · saved on device'):'Saved on this device');}
+function status(msg){$('#sync-status').textContent=msg||(sync.conflict?'Sync conflict · open Settings':null)||(sync.enabled?(sync.pending?'Changes waiting to sync':'Synced · saved on device'):'Saved on this device');}
 function toast(s){$('#toast').textContent=s;$('#toast').style.display='block';clearTimeout(toast.timer);toast.timer=setTimeout(()=>$('#toast').style.display='none',4500);}
 function modal(html){$('#dialog-body').innerHTML=html;if(!$('#dialog').open)$('#dialog').showModal();}
 function close(){ $('#dialog').close(); }
@@ -21,7 +22,7 @@ function ensure(){const start=today(),end=E.add(startCycle(),27),before=JSON.str
 function action(a,label,attrs='',cls=''){return `<button class="${cls}" data-action="${a}" ${attrs}>${label}</button>`;}
 function render(){document.querySelectorAll('[data-tab]').forEach(b=>b.classList.toggle('active',b.dataset.tab===tab));$('#view').innerHTML=({plan:renderPlan,shop:renderShop,recipes:renderRecipes,pantry:renderPantry,settings:renderSettings})[tab]();status();}
 function heading(title,sub,extra=''){return `<div class="heading"><div><h1>${title}</h1><p>${sub}</p></div>${extra}</div>`;}
-function renderPlan(){const recipes=all(),start=E.add(startCycle(),week*7),d=today(),entry=state.plan[d],r=recipes[entry?.id],l=E.lunch(state,E.add(d,1));
+function renderPlan(){const recipes=all(),start=E.add(weekStart(),week*7),d=today(),entry=state.plan[d],r=recipes[entry?.id],l=E.lunch(state,E.add(d,1));
  return heading('Good food. Less guesswork.','Your dinners, planned. Tomorrow’s lunch, handled.',action('extend','Plan ahead','','primary'))+
  `<section class="hero"><div class="hero-main"><span class="eyebrow">TONIGHT · ${format(d,{weekday:'long'}).toUpperCase()}</span><h2>${esc(entry?.skipped?'A night off':r?.name||'Your next dinner awaits')}</h2><p>${r&&!entry?.skipped?`${r.prepTime+r.cookTime} minutes · 4 servings · dinner + leftovers`:'Your plan makes room for real life.'}</p><div class="actions">${r&&!entry.skipped?action('recipe',entry.cooked?'View recipe':'Let’s cook',`data-id="${esc(entry.id)}"`)+action('swap','Swap meal',`data-day="${d}"`):''}</div></div><div class="hero-side"><span class="eyebrow">TOMORROW’S LUNCH · FOR TWO</span><strong>${esc(l?recipes[l.id]?.name:'No lunch planned')}</strong><p>${l?(l.batch?'From your lunch batch.':l.ready?'Leftovers are ready.':'Set aside two portions when you cook tonight.'):'Add a lunch batch or plan tonight’s dinner.'}</p></div></section>`+
  `<div class="toolbar"><div><span class="eyebrow">ON THE MENU</span><h2 style="margin-top:8px">${format(start)} – ${format(E.add(start,6))}</h2></div><div class="row">${action('week-prev','←','aria-label="Previous week"')}${action('week-now','This week')}${action('week-next','→','aria-label="Next week"')}</div></div><div class="week-list">`+
@@ -73,7 +74,7 @@ document.addEventListener('click',async event=>{const b=event.target.closest('bu
  case 'save-anchor':{const anchor=$('#anchor').value;if(!anchor||E.date(anchor).getDay()!==0){toast('Choose a Sunday for bulk shopping.');return;}state.anchor=anchor;persist();toast('Shopping schedule updated. Existing dinners kept.');break;}
  case 'export':download();return;case 'import-backup':$('#backup-file').click();return;case 'import-recipes':$('#recipes-file').click();return;
  case 'toggle-sync':sync.enabled=!sync.enabled;saveSync();if(sync.enabled)await syncNow();break;case 'sync':if(!sync.enabled){toast('Enable cloud sync first.');return;}await syncNow();break;
- case 'load-remote':if(confirm('Replace this device’s planner with the cloud copy? Export a backup first if you want to keep local changes.')){const remote=await cloudRead(KEY);if(remote){localStorage.setItem('mealplan_v2_before_cloud',JSON.stringify(state));state=remote.value;sync.base=remote.updated_at;sync.pending=false;sync.conflict=false;localStorage.setItem(KEY,JSON.stringify(state));saveSync();}}break;
+ case 'load-remote':if(confirm('Replace this device’s planner with the cloud copy? Export a backup first if you want to keep local changes.')){const remote=await cloudRead(KEY);if(remote){validateState(remote.value);localStorage.setItem('mealplan_v2_before_cloud',JSON.stringify(state));state=remote.value;sync.base=remote.updated_at;sync.pending=false;sync.conflict=false;localStorage.setItem(KEY,JSON.stringify(state));saveSync();}}break;
  case 'import-legacy-cloud':await importLegacy();break;
  default:return;
  }render();}catch(error){toast(error.message||'Could not complete that action.');}
@@ -106,3 +107,4 @@ $('#close-dialog').onclick=close;$('#dialog').addEventListener('click',e=>{if(e.
 window.addEventListener('online',syncNow);window.addEventListener('storage',e=>{if(e.key===KEY&&!busy){state=read(KEY,state);sync=read(META,sync);render();}});
 try{ensure();}catch(e){toast(e.message);}render();if(sync.enabled)syncNow();
 if(location.protocol!=='file:'&&'serviceWorker'in navigator)navigator.serviceWorker.register('./sw.js').catch(()=>toast('Offline installation unavailable in this preview.'));
+
