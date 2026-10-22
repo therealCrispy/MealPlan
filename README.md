@@ -1,0 +1,43 @@
+# MealPlan 2
+
+A static, mobile-first dinner planner for two people. Each dinner makes four portions, with two reserved for the following day's lunch. No build step or runtime package installation is required.
+
+## Run and test
+
+Serve this directory with any static HTTP server, for example `python3 -m http.server 8765`, and open `http://localhost:8765`. HTTPS or localhost is required for service-worker offline installation.
+
+Run `TZ=America/Chicago node --test tests/*.test.js` with Node 20 or newer.
+
+## Planning
+
+- Saved schedules are generated ahead, rather than recalculated on every render.
+- Actual assigned dinners are used for the 14-day repeat window. Recency, protein, dish style, and weekend crockpot preference influence selection. With too few enabled recipes, repeats are permitted instead of failing to produce a plan.
+- Replacements and two-day exchanges are explicit changes. They update next-day leftover lunches and shopping periods. A user-selected repeat is permitted.
+- Lunch batches provide two portions per day and replace leftover lunches on their dates. They are purchased once and can be marked prepped separately.
+- Paused recipes are excluded from new generation; previously saved dinners remain unchanged.
+
+## Shopping and inventory
+
+Bulk shopping occurs every other Sunday, covering Monday through the next 14 days. Local shopping happens weekly for seven days of selected fresh ingredients. The anchor Sunday is editable. The existing store classification is retained.
+
+Shopping deducts available inventory after reserving quantities needed by earlier uncooked meals. The top-up view covers today through the next Sunday. Recording a purchase adds the actual package quantity to inventory, including excess. Cooking deducts only available stock once. Undo restores only what was actually deducted.
+
+Compatible units are converted (pounds/ounces and cups/tablespoons/teaspoons). Mass, volume, and counts are kept separate. Ingredients with different wording can remain separate; this intentionally avoids guessing density, package sizes, or substitutions. Review quantities when importing recipes.
+
+Replacement suggestions reserve inventory for other saved meals. They show missing ingredients before confirmation. Purchased food is never removed just because its original dinner was replaced.
+
+## Data and migration
+
+`mealplan_v2` is stored locally. Legacy keys are retained, and a local legacy backup is recorded before migration. Existing custom recipes, paused recipes, prices, and pantry reference values are retained. Old pantry quantities require a one-time unit review; checked shopping items are not treated as proof of remaining stock. The previous unsaved rotation is not presented as historical cooking records.
+
+Settings supports JSON backup/restore, recipe import, and optional import from the previous Supabase record set. Restore retains a local pre-restore copy.
+
+Cloud sync is opt-in and reuses the existing public Supabase browser connection with a separate `mealplan_v2` row. It uses the last observed `updated_at` value as a conditional-write guard. Pending local changes are never silently replaced by remote data. If another device changed the cloud row, export the local backup and explicitly choose the cloud copy. Keep the Supabase table's existing access policies in mind: this change does not introduce authentication or modify RLS.
+
+## Verification and remaining review
+
+Automated checks cover scheduling, actual swap history, stable reloads, migration, unit conversion, leftovers, batch quantities, reservations, purchase-related view calculations, idempotent cooking/undo, date boundaries, markup escaping, and rendering of the main views/dialogs using a lightweight DOM stub.
+
+A real-browser visual/accessibility pass, iPhone installation/offline smoke test, and live two-device cloud-sync test are still required. The execution environment blocked localhost serving and file-URL browser preview, so these are not claimed as tested. The draft PR should remain unmerged until that review.
+
+Known limits: inventory is quantity-based, not a lot/expiry tracker; leftover storage and freezing are not tracked. Lunch batches leave four-serving dinners unchanged, so surplus dinner leftovers need household management. Legacy unit prices remain backed up; new cart estimates learn prices from purchases and clearly report partial coverage.
