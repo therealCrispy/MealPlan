@@ -37,7 +37,7 @@ function requirements(state,recipes,start,end,exclude){const out={};function inc
  for(const [d,e] of Object.entries(state.batches||{})){if(d<start||d>end||e.cooked||!recipes[e.id])continue;include(recipes[e.id],e.days*2);}return out;}
 function missing(state,recipes,id,day){const days=Object.keys(state.plan).filter(d=>d>=day);const end=days.sort().at(-1)||day;const reserved=requirements(state,recipes,day,end,day);
  // Reserve earlier uncooked dinners too: they may have been delayed.
- const earlier=requirements({...state,batches:{}},recipes,'1900-01-01',add(day,-1));for(const[k,i]of Object.entries(earlier)){if(reserved[k])reserved[k].qty+=i.qty;else reserved[k]=i;}
+ const earlier=requirements(state,recipes,'1900-01-01',add(day,-1));for(const[k,i]of Object.entries(earlier)){if(reserved[k])reserved[k].qty+=i.qty;else reserved[k]=i;}
  return Object.values(amounts(recipes[id])).map(i=>({...i,qty:Math.max(0,i.qty-Math.max(0,(state.stock[i.key]?.qty||0)-(reserved[i.key]?.qty||0)))})).filter(i=>i.qty>.001);
 }
 function cook(state,recipes,day,batch=false){const e=(batch?state.batches:state.plan)[day];if(!e||e.cooked||e.skipped)return;const used=amounts(recipes[e.id],batch?e.days*2:e.servings||4);e.consumed={};for(const[k,i]of Object.entries(used)){const available=state.stock[k]?.qty||0;e.consumed[k]=Math.min(available,i.qty);if(state.stock[k])state.stock[k].qty=Math.max(0,available-i.qty);}e.cooked=true;}
@@ -45,3 +45,4 @@ function uncook(state,day,batch=false){const e=(batch?state.batches:state.plan)[
 function lunch(state,day){for(const[d,b]of Object.entries(state.batches||{}).sort(([a],[b])=>b.localeCompare(a))){if(day>=d&&day<add(d,b.days))return {id:b.id,batch:true,ready:b.cooked};}const e=state.plan[add(day,-1)];return e&&!e.skipped?{id:e.id,ready:e.cooked,batch:false}:null;}
 const api={key,date,add,diff,ingredient,amounts,traits,generate,requirements,missing,cook,uncook,lunch};if(typeof module!=='undefined')module.exports=api;else root.Engine=api;
 })(typeof window==='undefined'?globalThis:window);
+
