@@ -1,5 +1,5 @@
 'use strict';
-const APP_VERSION='1.0';
+const APP_VERSION='1.1';
 const E=Engine,KEY='mealplan_v2',META='mealplan_v2_sync';
 const $=s=>document.querySelector(s),esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const today=()=>E.key(new Date());
@@ -16,15 +16,16 @@ const bulk=d=>((E.diff(d,state.anchor)%14)+14)%14===0;
 function persist(){try{localStorage.setItem(KEY,JSON.stringify(state));sync.pending=true;localStorage.setItem(META,JSON.stringify(sync));status();if(sync.enabled)setTimeout(syncNow,400);}catch(e){toast('Could not save: device storage is full. Export a backup now.');throw e;}}
 function status(msg){$('#sync-status').textContent=msg||(sync.conflict?'Sync conflict · open Settings':null)||(sync.enabled?(sync.pending?'Changes waiting to sync':'Synced · saved on device'):'Saved on this device');}
 function toast(s){$('#toast').textContent=s;$('#toast').style.display='block';clearTimeout(toast.timer);toast.timer=setTimeout(()=>$('#toast').style.display='none',4500);}
-function modal(html){$('#dialog-body').innerHTML=html;if(!$('#dialog').open)$('#dialog').showModal();$('#dialog').scrollTop=0;}
-function close(){ $('#dialog').close(); }
+function modal(html){document.dispatchEvent?.(new Event('mealplan:sheet-change'));$('#dialog-body').innerHTML=html;if(!$('#dialog').open)$('#dialog').showModal();$('#dialog').scrollTop=0;}
+function close(){document.dispatchEvent?.(new Event('mealplan:sheet-change')); $('#dialog').close(); }
 function qty(i){let q=i.qty,u=i.unit;if(u==='oz'&&q>=16){q/=16;u='lb'}if(u==='tsp'&&q>=48){q/=48;u='cup'}else if(u==='tsp'&&q>=3){q/=3;u='tbsp'}return `${Number(q.toFixed(2))} ${u==='each'?'':u}`.trim();}
 function ensure(){const start=today(),end=E.add(startCycle(),27),before=JSON.stringify(state.plan);E.generate(state,all(),start,Math.max(1,E.diff(end,start)+1));if(JSON.stringify(state.plan)!==before)persist();}
 function action(a,label,attrs='',cls=''){return `<button class="${cls}" data-action="${a}" ${attrs}>${label}</button>`;}
 const tabPositions={};
 const TAB_ORDER=['plan','shop','recipes','pantry','settings'];
+function tabMarkup(next){const savedDay=shopDay,savedStore=store;try{return ({plan:renderPlan,shop:renderShop,recipes:renderRecipes,pantry:renderPantry,settings:renderSettings})[next]();}finally{shopDay=savedDay;store=savedStore;}}
 function switchTab(next){if(!TAB_ORDER.includes(next)||next===tab)return;tabPositions[tab]=window.scrollY||0;tab=next;render();window.scrollTo(0,tabPositions[next]||0);}
-function render(){document.querySelectorAll('[data-tab]').forEach(b=>{b.classList.toggle('active',b.dataset.tab===tab);b.setAttribute?.('aria-current',b.dataset.tab===tab?'page':'false')});$('#view').innerHTML=({plan:renderPlan,shop:renderShop,recipes:renderRecipes,pantry:renderPantry,settings:renderSettings})[tab]();status();}
+function render(){document.dispatchEvent?.(new Event('mealplan:before-render'));document.querySelectorAll('[data-tab]').forEach(b=>{b.classList.toggle('active',b.dataset.tab===tab);b.setAttribute?.('aria-current',b.dataset.tab===tab?'page':'false')});$('#view').innerHTML=({plan:renderPlan,shop:renderShop,recipes:renderRecipes,pantry:renderPantry,settings:renderSettings})[tab]();status();}
 function heading(title,sub,extra=''){return `<div class="heading"><div><h1>${title}</h1><p>${sub}</p></div>${extra}</div>`;}
 function scheduleStart(offset=week){return E.add(today(),offset*7);}
 function scheduleCards(offset=week){const recipes=all();return Array.from({length:7},(_,i)=>{const day=E.add(scheduleStart(offset),i),e=state.plan[day],r=recipes[e?.id],ln=E.lunch(state,day),sunday=E.date(day).getDay()===0;return `<button class="schedule-day ${day===today()?'today':''} ${e?.cooked?'done':''}" data-action="day-detail" data-day="${day}" aria-label="${esc(format(day,{weekday:'long',month:'long',day:'numeric'}))}: ${esc(e?.skipped?'Night off':r?.name||'Not planned')}"><span class="method-dot ${esc(r?.method||'')}"></span><span class="schedule-date"><small>${format(day,{weekday:'short'}).toUpperCase()}</small><strong>${E.date(day).getDate()}</strong></span><span class="schedule-copy"><strong>${esc(e?.skipped?'Night off':r?.name||'Not planned')}</strong><small>${e?.cooked?'✓ Cooked':r&&!e?.skipped?`${r.prepTime+r.cookTime} min · ${esc(r.method)} · 4 servings`:'Open for details'}</small><span class="schedule-lunch">Lunch · ${esc(ln?recipes[ln.id]?.name:'Not planned')}</span></span><span class="schedule-badges">${day===today()?'<span class="pill">TODAY</span>':''}${sunday?`<span class="pill shopping-badge">${bulk(day)?'BULK + LOCAL':'LOCAL SHOP'}</span>`:''}<span aria-hidden="true" class="schedule-chevron">›</span></span></button>`;}).join('');}

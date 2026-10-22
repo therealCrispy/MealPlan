@@ -1,4 +1,4 @@
-# MealPlan v1.0
+# MealPlan v1.1
 
 A static, mobile-first dinner planner for two people. Each dinner makes four portions, with two reserved for the following day's lunch. No build step or runtime package installation is required.
 
@@ -56,3 +56,7 @@ Swipe left/right within the main content to move between Plan, Shopping, Recipes
 ## Release versions
 
 This replacement starts at v1.0. Increment the public app release by 0.1 each release: v1.1, v1.2, and onward (v1.9 is followed by v2.0). Update APP_VERSION in app.js, the visible version badge in index.html, and the service-worker CACHE suffix together. Public release versions are separate from the saved-data schema: retain schema version 2 and existing mealplan_v2 keys to preserve data.
+
+## v1.1
+
+Tab swipes now show the actual incoming page moving under the finger. Navigation, new drags, rendering, resize and backgrounding cancel outstanding gesture scenes and invalidate stale completion callbacks. Bottom navigation is excluded from the ghost-click suppression window. Sheets track downward touch movement from content when scrolled to the top, settle back after short/cancelled drags, and preserve native upward scrolling. Regression checks cover repeated interrupted navigation and sheet interactions; the suite has 42 passing tests. Real-device visual and gesture verification remains outstanding.
