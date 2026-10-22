@@ -1,4 +1,4 @@
-# MealPlan 2
+# MealPlan v1.0
 
 A static, mobile-first dinner planner for two people. Each dinner makes four portions, with two reserved for the following day's lunch. No build step or runtime package installation is required.
 
@@ -52,3 +52,7 @@ The interface has refined phone, tablet, and desktop layouts with consistent SVG
 ### One-handed navigation
 
 Swipe left/right within the main content to move between Plan, Shopping, Recipes, Kitchen and Settings. Tab swipes lock to the horizontal axis, respect the first/last tab, and never wrap. Vertical swipes in the calendar continue to page weeks. Native vertical scrolling remains available elsewhere. Inputs, forms, open dialogs, and screen-edge browser gestures are excluded from tab swiping. Each tab retains its scroll position and the selected schedule window stays intact. Bottom sheet close controls and meal actions remain reachable near the bottom; recipes opened from a planned day retain cooking and swap controls.
+
+## Release versions
+
+This replacement starts at v1.0. Increment the public app release by 0.1 each release: v1.1, v1.2, and onward (v1.9 is followed by v2.0). Update APP_VERSION in app.js, the visible version badge in index.html, and the service-worker CACHE suffix together. Public release versions are separate from the saved-data schema: retain schema version 2 and existing mealplan_v2 keys to preserve data.
