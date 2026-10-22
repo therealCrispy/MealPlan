@@ -41,3 +41,10 @@ Automated checks cover scheduling, actual swap history, stable reloads, migratio
 A real-browser visual/accessibility pass, iPhone installation/offline smoke test, and live two-device cloud-sync test are still required. The execution environment blocked localhost serving and file-URL browser preview, so these are not claimed as tested. The draft PR should remain unmerged until that review.
 
 Known limits: inventory is quantity-based, not a lot/expiry tracker; leftover storage and freezing are not tracked. Lunch batches leave four-serving dinners unchanged, so surplus dinner leftovers need household management. Legacy unit prices remain backed up; new cart estimates learn prices from purchases and clearly report partial coverage.
+
+
+## Touch and responsive interface
+
+The mobile navigation uses safe-area spacing and 44px minimum button targets. Recipe and editing dialogs become bottom sheets on phones. Swipe horizontally over the schedule to change weeks; vertical scrolling and screen-edge browser gestures remain available. Swipe down on a sheet header to close it, or use its close button. Gestures never purchase, cook, or replace a meal. Keyboard buttons remain available, and reduced-motion preferences disable transitions. Returning from sleep refreshes the plan when the calendar day changes.
+
+The interface has refined phone, tablet, and desktop layouts with consistent SVG navigation icons, accessible focus indicators, larger form text to avoid iPhone input zoom, and self-contained navigation assets. Real-device touch and visual verification remain outstanding because this environment does not permit the local browser preview.
