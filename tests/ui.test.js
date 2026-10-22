@@ -1,14 +1,9 @@
-const test=require('node:test'),assert=require('node:assert/strict');
-const {swipeDirection}=require('../ui');
-test('horizontal swipes navigate in both directions',()=>{assert.equal(swipeDirection(-100,10,240),1);assert.equal(swipeDirection(100,-10,240),-1);});
-test('scrolls, taps, short drags and slow drags never change weeks',()=>{for(const args of [[20,2,100],[100,100,200],[5,120,250],[100,0,900],[0,0,0]])assert.equal(swipeDirection(...args),0);});
-test('touch gestures dispatch navigation and sheet dismissal without swallowing vertical scroll',()=>{
- const vm=require('node:vm'),fs=require('node:fs');const listeners={},clicks=[];let clock=0;
- const context={performance:{now:()=>clock},innerWidth:390,document:{addEventListener:(name,fn)=>{(listeners[name]||=[]).push(fn)},querySelector:selector=>({click:()=>clicks.push(selector)})}};
- vm.runInNewContext(fs.readFileSync(require.resolve('../ui'),'utf8'),context);
- function drag(x,y,endX,endY,sheet=false){const target={closest:selector=>selector==='.dialog-top'?sheet:selector==='.week-list'?!sheet:false};listeners.pointerdown[0]({pointerType:'touch',isPrimary:true,pointerId:1,clientX:x,clientY:y,target});clock+=200;listeners.pointerup[0]({pointerId:1,clientX:endX,clientY:endY});}
- drag(250,200,100,210);assert.match(clicks.pop(),/week-next/);
- drag(100,200,110,350);assert.equal(clicks.length,0);
- drag(10,200,160,210);assert.equal(clicks.length,0);
- drag(180,200,185,310,true);assert.equal(clicks.pop(),'#close-dialog');
-});
+const test=require('node:test'),assert=require('node:assert/strict'),vm=require('node:vm'),fs=require('node:fs');
+const {pageIntent}=require('../ui');
+test('vertical calendar accepts deliberate distance and quick flicks in both directions',()=>{assert.equal(pageIntent(5,-140,500,500),1);assert.equal(pageIntent(5,140,500,500),-1);assert.equal(pageIntent(2,-50,80,500),1);});
+test('taps, short drags and horizontal gestures do not turn pages',()=>{for(const args of [[0,0,0,500],[0,25,200,500],[130,60,100,500],[0,60,600,500]])assert.equal(pageIntent(...args),0);});
+function setup(){const listeners={},timers=[];let clock=0,renders=0;const stack={style:{},addEventListener(){},removeEventListener(){},getBoundingClientRect(){return {height:500}}};const viewport={clientHeight:500,isConnected:true,querySelector:()=>stack,appendChild(){}};let adjacent;const context={performance:{now:()=>clock},innerWidth:390,innerHeight:800,window:{matchMedia:()=>({matches:false})},week:0,scheduleCards:()=>'<button>Meal</button>',render:()=>renders++,requestAnimationFrame:fn=>fn(),setTimeout:fn=>{timers.push(fn);return timers.length},clearTimeout(){},document:{addEventListener:(name,fn)=>{(listeners[name]||=[]).push(fn)},createElement:()=>adjacent={style:{},setAttribute(){},remove(){this.removed=true}},querySelector:()=>viewport}};vm.createContext(context);vm.runInContext(fs.readFileSync(require.resolve('../ui'),'utf8'),context);return {context,listeners,stack,viewport,advance:n=>clock+=n,flush:()=>{while(timers.length)timers.shift()()},adjacent:()=>adjacent,renders:()=>renders};}
+function drag(app,endY,cancel=false){const target={closest:s=>s==='.schedule-viewport'?app.viewport:null};const event={isPrimary:true,pointerType:'touch',pointerId:1,clientX:180,clientY:300,target};app.listeners.pointerdown[0](event);app.advance(300);app.listeners.pointermove[0]({...event,clientY:endY});app.listeners[cancel?'pointercancel':'pointerup'][0]({...event,clientY:endY});app.flush();}
+test('dragging moves both pages and commits exactly one week',()=>{const app=setup();drag(app,140);assert.equal(app.context.week,1);assert.equal(app.renders(),1);assert.ok(app.adjacent().removed);assert.equal(app.stack.style.transform,'');});
+test('partial and cancelled drags restore the original week',()=>{for(const [end,cancel] of [[270,false],[140,true]]){const app=setup();drag(app,end,cancel);assert.equal(app.context.week,0);assert.equal(app.renders(),0);assert.ok(app.adjacent().removed);assert.equal(app.stack.style.transform,'');}});
+test('wheel momentum pages once until the gesture becomes idle',()=>{const app=setup();let prevented=0;const event={target:{closest:()=>app.viewport},deltaX:0,deltaY:90,deltaMode:0,preventDefault:()=>prevented++};app.listeners.wheel[0](event);app.listeners.wheel[0](event);assert.equal(prevented,2);app.flush();assert.equal(app.context.week,1);assert.equal(app.renders(),1);});
